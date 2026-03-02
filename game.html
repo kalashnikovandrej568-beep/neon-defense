@@ -210,18 +210,16 @@ let WAYPOINTS = [
   [-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]
 ];
 
-// Generate random path each game
-// Pattern: segments of [vertical move] then [horizontal move]
-// Goes LEFT and RIGHT, but after left always follows right (and vice-ok)
-// After up-left → up-right, after down-left → down-right
-// Paths never cross themselves, length ~TARGET for balanced difficulty
+// Random path generation
+// Logic: vertical move (up/down) → then 50/50 left or right → repeat
+// No self-crossing. Length normalized ~TARGET_PATH_LENGTH for balanced difficulty.
 const TARGET_PATH_LENGTH = 45;
 
 function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 
 function generateRandomWaypoints() {
   let best = null;
-  for (let attempt = 0; attempt < 60; attempt++) {
+  for (let attempt = 0; attempt < 80; attempt++) {
     const result = tryGeneratePath();
     if (!result) continue;
     const len = calcPathLen(result);
@@ -230,11 +228,7 @@ function generateRandomWaypoints() {
     }
     if (Math.abs(calcPathLen(best) - TARGET_PATH_LENGTH) <= 4) break;
   }
-  if (!best) {
-    WAYPOINTS = [[-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]];
-    return;
-  }
-  WAYPOINTS = best;
+  WAYPOINTS = best || [[-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]];
 }
 
 function calcPathLen(wp) {
@@ -246,185 +240,115 @@ function calcPathLen(wp) {
 }
 
 function tryGeneratePath() {
-  const margin = 1;
-  const maxY = ROWS - margin - 1;
-  const minY = margin;
-  const maxX = COLS - margin - 1;
-  const minX = margin;
+  const M = 1; // margin from edges
+  const used = new Set();
+  const key = (x, y) => x + ',' + y;
 
-  // Occupied columns tracking — store ranges per column to prevent crossing
-  // We track all cells the path uses
-  const usedCells = new Set();
-
-  function cellKey(x, y) { return x + ',' + y; }
-  function isUsed(x, y) { return usedCells.has(cellKey(x, y)); }
-
-  // Mark a straight segment and check for crossing
-  function canMarkSegment(x1, y1, x2, y2) {
+  // Check & mark a straight line. Returns cells array or null if blocked.
+  function trySegment(x1, y1, x2, y2) {
     const cells = [];
     if (x1 === x2) {
-      // Vertical
-      const step = y2 > y1 ? 1 : -1;
-      for (let y = y1; y !== y2 + step; y += step) {
-        if (y === y1 && cells.length === 0) { /* start cell — already marked */ }
-        if (isUsed(x1, y) && !(x1 === x1 && y === y1)) return null; // crosses except start
+      const s = y2 > y1 ? 1 : -1;
+      for (let y = y1; y !== y2 + s; y += s) {
+        if (y !== y1 && used.has(key(x1, y))) return null;
         cells.push([x1, y]);
       }
     } else {
-      // Horizontal
-      const step = x2 > x1 ? 1 : -1;
-      for (let x = x1; x !== x2 + step; x += step) {
-        if (isUsed(x, y1) && !(x === x1 && y1 === y1)) return null;
+      const s = x2 > x1 ? 1 : -1;
+      for (let x = x1; x !== x2 + s; x += s) {
+        if (x !== x1 && used.has(key(x, y1))) return null;
         cells.push([x, y1]);
       }
     }
     return cells;
   }
 
-  function markCells(cells) {
-    for (const [cx, cy] of cells) usedCells.add(cellKey(cx, cy));
+  function mark(cells) { for (const [x, y] of cells) used.add(key(x, y)); }
+
+  // Try segment, if blocked try shorter lengths down to minLen
+  function trySegmentShorter(x1, y1, dx, dy, maxLen, minLen) {
+    for (let len = maxLen; len >= minLen; len--) {
+      const x2 = x1 + dx * len;
+      const y2 = y1 + dy * len;
+      if (x2 < M || x2 > COLS - M - 1 || y2 < M || y2 > ROWS - M - 1) continue;
+      const cells = trySegment(x1, y1, x2, y2);
+      if (cells) return { cells, x: x2, y: y2 };
+    }
+    return null;
   }
 
-  // Entry
-  const entryY = randInt(minY + 1, maxY - 1);
+  // ── Start: enter from left ──
+  const entryY = randInt(M + 1, ROWS - M - 2);
   const startX = randInt(1, 2);
   const wp = [[-1, entryY], [startX, entryY]];
+  for (let x = 0; x <= startX; x++) used.add(key(x, entryY));
 
-  // Mark entry segment
-  for (let x = 0; x <= startX; x++) usedCells.add(cellKey(x, entryY));
+  let cx = startX, cy = entryY;
+  const segs = randInt(5, 8); // number of vertical+horizontal pairs
 
-  let curX = startX;
-  let curY = entryY;
+  for (let i = 0; i < segs; i++) {
+    const isLast = (i === segs - 1);
 
-  // We'll build paired segments:
-  // Pair = [vertical move] + [horizontal move]
-  // If horizontal goes LEFT, next pair's horizontal MUST go RIGHT
-  // Vertical direction follows rule: up-left → up-right, down-left → down-right
-  const numPairs = randInt(4, 7);
-  let lastHDir = 1; // start as if we came from the left (last horizontal was right)
-  let lastVDir = 0; // no vertical preference yet
-
-  for (let p = 0; p < numPairs; p++) {
-    const isLast = (p === numPairs - 1);
-
-    // ── VERTICAL MOVE ──
-    // Pick vertical direction
-    let vDir;
-    if (lastHDir === -1) {
-      // After going left: keep same vertical direction
-      // up-left → up-right, down-left → down-right
-      vDir = lastVDir || (Math.random() > 0.5 ? 1 : -1);
-    } else {
-      // After going right: free to pick any vertical direction
-      vDir = Math.random() > 0.5 ? 1 : -1;
-    }
-
-    // Vertical distance: 2-6 cells
+    // ═══ Step 1: Vertical move (up or down, random) ═══
+    let vDir = Math.random() < 0.5 ? -1 : 1; // -1=up, 1=down
     let vLen = randInt(2, 6);
-    let targetY = curY + vDir * vLen;
-    targetY = Math.max(minY, Math.min(maxY, targetY));
-    if (targetY === curY) {
-      // Flip direction if can't move
-      targetY = curY - vDir * vLen;
-      targetY = Math.max(minY, Math.min(maxY, targetY));
+
+    let vResult = trySegmentShorter(cx, cy, 0, vDir, vLen, 2);
+    if (!vResult) {
+      // Try opposite direction
       vDir = -vDir;
+      vResult = trySegmentShorter(cx, cy, 0, vDir, vLen, 2);
     }
-    if (targetY === curY) continue; // stuck, skip
+    if (!vResult) continue; // stuck, skip
 
-    // Check vertical segment for crossing
-    const vCells = canMarkSegment(curX, curY, curX, targetY);
-    if (!vCells) continue; // would cross, skip this pair
-    markCells(vCells);
-    curY = targetY;
-    wp.push([curX, curY]);
-    lastVDir = vDir;
+    mark(vResult.cells);
+    cy = vResult.y;
+    wp.push([cx, cy]);
 
-    // ── HORIZONTAL MOVE ──
-    let hDir;
-    if (lastHDir === -1) {
-      // After left, MUST go right
-      hDir = 1;
-    } else {
-      // After right, can go left (40% chance) or right (60%)
-      // But not on the last pair (must exit right)
-      if (isLast || curX < 4) {
-        hDir = 1; // too far left or last — go right
-      } else {
-        hDir = Math.random() < 0.4 ? -1 : 1;
-      }
-    }
+    // ═══ Step 2: Horizontal move — 50/50 left or right ═══
+    let hDir = Math.random() < 0.5 ? -1 : 1; // -1=left, 1=right
 
-    // Horizontal distance
-    let hLen;
-    if (hDir === -1) {
-      // Going left: shorter (2-4), don't go past column 2
-      hLen = randInt(2, 4);
-      const limit = curX - minX;
-      hLen = Math.min(hLen, limit);
-      if (hLen < 2) { hDir = 1; hLen = randInt(2, 5); } // can't go left, go right instead
-    }
-    if (hDir === 1) {
+    // On last segment or if too far left, force right
+    if (isLast || (hDir === -1 && cx <= M + 2)) hDir = 1;
+    // If too far right and not last, allow left more
+    if (!isLast && cx >= COLS - 5) hDir = -1;
+
+    let hLen = randInt(2, 5);
+    // Last segment: go to right edge
+    if (isLast) hLen = Math.max(COLS - M - 1 - cx, 2);
+
+    let hResult = trySegmentShorter(cx, cy, hDir, 0, hLen, 2);
+    if (!hResult) {
+      // Try other direction
+      hDir = -hDir;
+      if (isLast) hDir = 1; // last must go right
       hLen = randInt(2, 5);
-      if (isLast) {
-        // On last pair, reach the right edge
-        hLen = maxX - curX;
-        if (hLen < 1) hLen = 1;
-      }
+      if (isLast) hLen = Math.max(COLS - M - 1 - cx, 2);
+      hResult = trySegmentShorter(cx, cy, hDir, 0, hLen, 2);
     }
+    if (!hResult) continue; // skip
 
-    let targetX = curX + hDir * hLen;
-    targetX = Math.max(minX, Math.min(maxX, targetX));
-    if (targetX === curX) continue;
+    mark(hResult.cells);
+    cx = hResult.x;
+    wp.push([cx, cy]);
 
-    // Check horizontal segment for crossing
-    const hCells = canMarkSegment(curX, curY, targetX, curY);
-    if (!hCells) {
-      // Try shorter
-      let shortened = false;
-      for (let tryLen = Math.abs(targetX - curX) - 1; tryLen >= 2; tryLen--) {
-        const tryX = curX + hDir * tryLen;
-        const tryCells = canMarkSegment(curX, curY, tryX, curY);
-        if (tryCells) {
-          markCells(tryCells);
-          curX = tryX;
-          wp.push([curX, curY]);
-          shortened = true;
-          break;
-        }
-      }
-      if (!shortened) continue; // skip this pair
-    } else {
-      markCells(hCells);
-      curX = targetX;
-      wp.push([curX, curY]);
-    }
-
-    lastHDir = hDir;
-
-    // If we reached far right, we're done
-    if (curX >= maxX - 1) break;
+    // Done if reached right edge
+    if (cx >= COLS - M - 2) break;
   }
 
-  // Must reach far enough right
-  if (curX < COLS - 5) return null;
+  // Must reach far right
+  if (cx < COLS - 5) return null;
 
-  // Walk to right edge
-  if (curX < maxX) {
-    const exitCells = canMarkSegment(curX, curY, maxX, curY);
-    if (exitCells) {
-      markCells(exitCells);
-      curX = maxX;
-      wp.push([curX, curY]);
-    }
+  // Extend to right edge if needed
+  if (cx < COLS - M - 1) {
+    const ext = trySegment(cx, cy, COLS - M - 1, cy);
+    if (ext) { mark(ext); cx = COLS - M - 1; wp.push([cx, cy]); }
   }
 
-  // Exit off-screen
-  wp.push([COLS, curY]);
+  // Exit off-screen right
+  wp.push([COLS, cy]);
 
-  // Validate: at least 6 waypoints for interesting path
-  if (wp.length < 6) return null;
-
-  return wp;
+  return wp.length >= 6 ? wp : null;
 }
 
 const TOWER_DEFS = {
