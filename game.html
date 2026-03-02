@@ -8,10 +8,54 @@
 *{margin:0;padding:0;box-sizing:border-box}
 body{background:#0a0014;overflow:hidden;font-family:'Segoe UI',monospace;cursor:crosshair;user-select:none;touch-action:none;-webkit-touch-callout:none;-webkit-user-select:none}
 canvas{display:block}
-#startScreen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:linear-gradient(180deg,#0a0014 0%,#1a0030 40%,#2a0040 70%,#0a0014 100%)}
-#startScreen h1{font-size:clamp(36px,8vw,90px);color:#ff00ff;text-shadow:0 0 20px #ff00ff,0 0 60px #ff00ff,0 0 120px #ff006688;letter-spacing:8px;margin-bottom:10px;animation:titlePulse 3s ease-in-out infinite}
-#startScreen h2{font-size:clamp(14px,3vw,28px);color:#00ffff;text-shadow:0 0 15px #00ffff,0 0 40px #00ffff;letter-spacing:12px;margin-bottom:60px;text-transform:uppercase}
-#startScreen .start-btn{font-size:clamp(16px,3vw,24px);color:#ffcc00;text-shadow:0 0 15px #ffcc00,0 0 30px #ffcc00;letter-spacing:6px;animation:blink 1.5s ease-in-out infinite;cursor:pointer;background:none;border:2px solid #ffcc0066;padding:15px 50px;text-transform:uppercase;font-family:inherit;transition:all .3s}
+/* ─── START SCREEN ─── */
+#startScreen{position:fixed;top:0;left:0;width:100%;height:100%;display:flex;flex-direction:column;align-items:center;z-index:100;background:linear-gradient(180deg,#0a0014 0%,#1a0030 40%,#2a0040 70%,#0a0014 100%);overflow-y:auto;padding:10px 0}
+#startScreen h1{font-size:clamp(28px,7vw,72px);color:#ff00ff;text-shadow:0 0 20px #ff00ff,0 0 60px #ff00ff,0 0 120px #ff006688;letter-spacing:8px;margin-top:clamp(10px,3vh,30px);margin-bottom:4px;animation:titlePulse 3s ease-in-out infinite}
+#startScreen h2{font-size:clamp(11px,2.5vw,22px);color:#00ffff;text-shadow:0 0 15px #00ffff,0 0 40px #00ffff;letter-spacing:10px;margin-bottom:clamp(10px,2vh,25px);text-transform:uppercase}
+/* Tabs */
+.menu-tabs{display:flex;gap:0;margin-bottom:0;flex-shrink:0}
+.menu-tab{padding:10px clamp(14px,3vw,32px);font-family:inherit;font-size:clamp(11px,2vw,16px);letter-spacing:3px;text-transform:uppercase;background:none;border:2px solid #ffffff22;border-bottom:none;color:#8899aa;cursor:pointer;transition:all .3s;position:relative;top:2px}
+.menu-tab:first-child{border-radius:8px 0 0 0}
+.menu-tab:last-child{border-radius:0 8px 0 0}
+.menu-tab.active{color:#00ffff;background:#0a001488;border-color:#00ffff44;text-shadow:0 0 10px #00ffff}
+.menu-tab:hover:not(.active){color:#aabbcc;border-color:#ffffff44}
+/* Tab content */
+.menu-body{width:min(92vw,560px);min-height:clamp(220px,45vh,400px);max-height:clamp(260px,55vh,480px);background:rgba(10,0,30,.75);border:2px solid #00ffff22;border-radius:0 8px 12px 12px;padding:clamp(12px,2.5vh,24px) clamp(14px,3vw,28px);overflow-y:auto;backdrop-filter:blur(8px);scrollbar-width:thin;scrollbar-color:#00ffff44 transparent;flex-shrink:0}
+.menu-body::-webkit-scrollbar{width:6px}
+.menu-body::-webkit-scrollbar-thumb{background:#00ffff44;border-radius:3px}
+.menu-body::-webkit-scrollbar-track{background:transparent}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+/* Tab: Game desc */
+.game-desc{color:#ccddee;font-size:clamp(12px,1.6vw,15px);line-height:1.7;text-shadow:0 0 6px #223344}
+.game-desc p{margin-bottom:12px}
+.game-desc .hl{color:#ffcc00;text-shadow:0 0 8px #ffcc0066}
+.game-desc .hl-cyan{color:#00ffff;text-shadow:0 0 8px #00ffff66}
+.game-desc .hl-pink{color:#ff44aa;text-shadow:0 0 8px #ff44aa66}
+/* Tab: Tutorial */
+.tut-section{margin-bottom:14px}
+.tut-section h3{color:#ff00ff;font-size:clamp(12px,1.8vw,16px);letter-spacing:3px;margin-bottom:6px;text-shadow:0 0 12px #ff00ff66;text-transform:uppercase}
+.tut-row{display:flex;align-items:center;gap:10px;margin-bottom:6px;color:#ccddee;font-size:clamp(11px,1.4vw,14px);line-height:1.5}
+.tut-icon{min-width:28px;text-align:center;font-size:18px}
+.tut-key{display:inline-block;background:#ffffff15;border:1px solid #ffffff33;border-radius:4px;padding:1px 7px;color:#00ffff;font-size:12px;letter-spacing:1px;text-shadow:0 0 6px #00ffff;font-family:inherit;margin:0 2px}
+.tower-mini{display:inline-flex;align-items:center;gap:5px;margin:2px 0}
+.tower-dot{width:10px;height:10px;border-radius:50%;display:inline-block;box-shadow:0 0 6px currentColor}
+/* Tab: Settings */
+.settings-group{margin-bottom:18px}
+.settings-group h3{color:#ff00ff;font-size:clamp(12px,1.8vw,16px);letter-spacing:3px;margin-bottom:10px;text-shadow:0 0 12px #ff00ff66;text-transform:uppercase}
+.setting-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:12px}
+.setting-label{color:#aabbcc;font-size:clamp(12px,1.5vw,15px);letter-spacing:1px;min-width:90px}
+.setting-value{color:#00ffcc;font-size:13px;min-width:36px;text-align:right;text-shadow:0 0 8px #00ffcc66}
+input[type=range].neon-slider{-webkit-appearance:none;appearance:none;width:clamp(120px,22vw,200px);height:6px;background:linear-gradient(90deg,#00ffff44,#ff00ff44);border-radius:3px;outline:none;cursor:pointer}
+input[type=range].neon-slider::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:#00ffff;box-shadow:0 0 10px #00ffff,0 0 20px #00ffff44;cursor:pointer}
+input[type=range].neon-slider::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#00ffff;box-shadow:0 0 10px #00ffff,0 0 20px #00ffff44;border:none;cursor:pointer}
+.diff-btns{display:flex;gap:6px}
+.diff-btn{padding:6px clamp(10px,2vw,18px);font-family:inherit;font-size:clamp(11px,1.4vw,14px);background:none;border:2px solid #ffffff22;color:#8899aa;border-radius:6px;cursor:pointer;letter-spacing:1px;transition:all .3s;text-transform:uppercase}
+.diff-btn.active{border-color:#ffcc00;color:#ffcc00;text-shadow:0 0 10px #ffcc00;background:#ffcc0011}
+.diff-btn:hover:not(.active){border-color:#ffffff44;color:#bbccdd}
+.diff-desc{color:#667788;font-size:clamp(10px,1.3vw,13px);margin-top:4px;font-style:italic;text-shadow:0 0 4px #22334466}
+/* Start button */
+#startScreen .start-btn{font-size:clamp(16px,3vw,24px);color:#ffcc00;text-shadow:0 0 15px #ffcc00,0 0 30px #ffcc00;letter-spacing:6px;animation:blink 1.5s ease-in-out infinite;cursor:pointer;background:none;border:2px solid #ffcc0066;padding:12px clamp(30px,6vw,50px);text-transform:uppercase;font-family:inherit;transition:all .3s;margin-top:clamp(10px,2vh,22px);flex-shrink:0}
 #startScreen .start-btn:hover{border-color:#ffcc00;background:#ffcc0011;box-shadow:0 0 30px #ffcc0044}
 @keyframes titlePulse{0%,100%{text-shadow:0 0 20px #ff00ff,0 0 60px #ff00ff,0 0 120px #ff006688}50%{text-shadow:0 0 30px #ff00ff,0 0 80px #ff00ff,0 0 160px #ff0066aa}}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
@@ -33,7 +77,101 @@ canvas{display:block}
 <div id="startScreen">
   <h1>NEON DEFENSE</h1>
   <h2>Retrowave Tower Defense</h2>
-  <button class="start-btn" id="startBtn">▶ START GAME ◀</button>
+
+  <!-- Tabs -->
+  <div class="menu-tabs">
+    <button class="menu-tab active" data-tab="tabGame">ИГРА</button>
+    <button class="menu-tab" data-tab="tabTutorial">КАК ИГРАТЬ</button>
+    <button class="menu-tab" data-tab="tabSettings">НАСТРОЙКИ</button>
+  </div>
+
+  <!-- Tab body -->
+  <div class="menu-body">
+
+    <!-- TAB: Game description -->
+    <div class="tab-panel active" id="tabGame">
+      <div class="game-desc">
+        <p><span class="hl-cyan">NEON DEFENSE</span> — ретровейв tower defense с процедурной синтвейв-музыкой. Защищай свою базу от волн врагов, ставь башни, исследуй древо технологий и используй мощные способности!</p>
+        <p>🏗️ <span class="hl">11 типов башен</span> — от лазера до рельсотрона. Каждая башня уникальна: замедление, поджог, яд, пробитие, отталкивание и многое другое.</p>
+        <p>🌳 <span class="hl">24 технологии</span> в 4 тирах — открывай новые башни и бонусы. Тир 4 даёт ультимативные эффекты:&nbsp;Инферно, Казнь, Орбитальный удар.</p>
+        <p>⚡ <span class="hl-pink">3 способности</span> — EMP оглушение, Авиаудар, Щит. Используй тактически для спасения базы!</p>
+        <p>👾 <span class="hl-cyan">Разнообразные враги</span> — быстрые, бронированные, невидимые, фантомы, сплиттеры и боссы с миньонами.</p>
+      </div>
+    </div>
+
+    <!-- TAB: Tutorial -->
+    <div class="tab-panel" id="tabTutorial">
+
+      <div class="tut-section">
+        <h3>🎯 Основы</h3>
+        <div class="tut-row"><div class="tut-icon">🏗️</div><div>Выбери башню в панели снизу и нажми на свободную клетку, чтобы поставить. Башни нельзя ставить на дорогу.</div></div>
+        <div class="tut-row"><div class="tut-icon">🌊</div><div>Нажми кнопку <span class="hl">WAVE</span> чтобы запустить волну врагов. Враги идут по пути к базе — не дай им дойти!</div></div>
+        <div class="tut-row"><div class="tut-icon">💰</div><div>За убийства получаешь <span class="hl">кредиты 💰</span> и <span class="hl-cyan">очки технологий TP</span>.</div></div>
+      </div>
+
+      <div class="tut-section">
+        <h3>🗼 Башни</h3>
+        <div class="tut-row"><div class="tower-dot" style="color:#00ffff"></div> <b style="color:#00ffff">Laser</b> — быстрый луч</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#ff00ff"></div> <b style="color:#ff00ff">Plasma</b> — AoE сплеш</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#aa44ff"></div> <b style="color:#aa44ff">Tesla</b> — цепная молния</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#4488ff"></div> <b style="color:#4488ff">Cryo</b> — замедление</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#ff6600"></div> <b style="color:#ff6600">Flame</b> — огнемёт 🔥 (нужен тех.)</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#88ff44"></div> <b style="color:#88ff44">Sniper</b> — дальнобойная (нужен тех.)</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#ff8844"></div> <b style="color:#ff8844">Mortar</b> — огромный AoE</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#44ff44"></div> <b style="color:#44ff44">Poison</b> — яд, распространяется</div>
+        <div class="tut-row"><div class="tower-dot" style="color:#ffff44"></div> <b style="color:#ffff44">Railgun</b> — пробивает всех насквозь</div>
+      </div>
+
+      <div class="tut-section">
+        <h3>🎮 Управление</h3>
+        <div class="tut-row"><div class="tut-icon">🖱️</div><div>ПК: Наведи мышь наверх/вниз экрана для переключения камеры (поле ↔ техдрево).</div></div>
+        <div class="tut-row"><div class="tut-icon">📱</div><div>Моб: Кнопка 🔭 справа внизу переключает камеру.</div></div>
+        <div class="tut-row"><div class="tut-icon">⌨️</div><div>Способности: <span class="tut-key">Q</span> EMP &nbsp; <span class="tut-key">W</span> Авиаудар &nbsp; <span class="tut-key">E</span> Щит</div></div>
+        <div class="tut-row"><div class="tut-icon">⏩</div><div>Скорость: <span class="tut-key">1</span> ×1 &nbsp; <span class="tut-key">2</span> ×2 &nbsp; <span class="tut-key">3</span> ×3</div></div>
+        <div class="tut-row"><div class="tut-icon">💲</div><div>Клик по башне — инфо. ПК: кнопка "Sell". Моб: двойной тап для продажи.</div></div>
+      </div>
+
+    </div>
+
+    <!-- TAB: Settings -->
+    <div class="tab-panel" id="tabSettings">
+
+      <div class="settings-group">
+        <h3>🔊 Звук</h3>
+        <div class="setting-row">
+          <span class="setting-label">Музыка</span>
+          <input type="range" class="neon-slider" id="sliderMusic" min="0" max="100" value="70">
+          <span class="setting-value" id="valMusic">70%</span>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">Эффекты</span>
+          <input type="range" class="neon-slider" id="sliderSfx" min="0" max="100" value="80">
+          <span class="setting-value" id="valSfx">80%</span>
+        </div>
+      </div>
+
+      <div class="settings-group">
+        <h3>⚔️ Сложность</h3>
+        <div class="diff-btns">
+          <button class="diff-btn" data-diff="easy">Легко</button>
+          <button class="diff-btn active" data-diff="normal">Обычно</button>
+          <button class="diff-btn" data-diff="hard">Сложно</button>
+        </div>
+        <div class="diff-desc" id="diffDesc">Стандартный баланс. 250💰, 20❤️.</div>
+      </div>
+
+      <div class="settings-group">
+        <h3>⚙️ Игра</h3>
+        <div class="setting-row">
+          <span class="setting-label">Авто-волна</span>
+          <button class="diff-btn" id="btnAutoWave" data-on="false">ВЫКЛ</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <button class="start-btn" id="startBtn">▶ НАЧАТЬ ИГРУ ◀</button>
 </div>
 <div id="gameOverScreen">
   <h1>GAME OVER</h1>
@@ -173,6 +311,20 @@ let screenShake = { x:0, y:0, intensity:0 };
 let gameSpeed = 1; // 1x, 2x, 3x
 const SPEED_OPTIONS = [1, 2, 3];
 let speedBtnBounds = null;
+
+// ─── SETTINGS ────────────────────────────────────
+let settingMusicVol = 0.70;  // 0..1
+let settingSfxVol   = 0.80;  // 0..1
+let settingDifficulty = 'normal'; // 'easy' | 'normal' | 'hard'
+let settingAutoWave = false;
+let musicGainNode = null;  // created during initAudio
+let sfxGainNode   = null;
+
+const DIFF_PRESETS = {
+  easy:   { credits:400, lives:30, hpMult:0.75, label:'Лёгкий режим. 400💰, 30❤️, враги слабее.' },
+  normal: { credits:250, lives:20, hpMult:1.0,  label:'Стандартный баланс. 250💰, 20❤️.' },
+  hard:   { credits:175, lives:12, hpMult:1.4,  label:'Для хардкорщиков. 175💰, 12❤️, враги крепче!' }
+};
 
 // ─── COMBO SYSTEM ────────────────────────────────
 let comboCount = 0;
@@ -402,11 +554,21 @@ function initAudio() {
   masterGain.gain.value = 0.45;
   masterGain.connect(ac.destination);
 
-  // Compressor
+  // Music gain node (controls music volume)
+  musicGainNode = ac.createGain();
+  musicGainNode.gain.value = settingMusicVol * 0.45;
+  musicGainNode.connect(masterGain);
+
+  // SFX gain node (controls sound effects volume)
+  sfxGainNode = ac.createGain();
+  sfxGainNode.gain.value = settingSfxVol * 0.5;
+  sfxGainNode.connect(masterGain);
+
+  // Compressor (for music chain)
   const comp = ac.createDynamicsCompressor();
   comp.threshold.value = -20;
   comp.ratio.value = 4;
-  comp.connect(masterGain);
+  comp.connect(musicGainNode);
 
   // Reverb
   reverbNode = createReverb(3, 2.5);
@@ -661,6 +823,7 @@ function playHihat(time, open) {
 // SFX
 function playSfx(type) {
   if (!ac) return;
+  const sfxDest = sfxGainNode || masterGain;
   const now = ac.currentTime;
   if (type === 'place') {
     const o = ac.createOscillator();
@@ -670,7 +833,7 @@ function playSfx(type) {
     const g = ac.createGain();
     g.gain.setValueAtTime(0.15, now);
     g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    o.connect(g); g.connect(masterGain);
+    o.connect(g); g.connect(sfxDest);
     o.start(now); o.stop(now + 0.2);
   } else if (type === 'sell') {
     const o = ac.createOscillator();
@@ -680,7 +843,7 @@ function playSfx(type) {
     const g = ac.createGain();
     g.gain.setValueAtTime(0.12, now);
     g.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-    o.connect(g); g.connect(masterGain);
+    o.connect(g); g.connect(sfxDest);
     o.start(now); o.stop(now + 0.2);
   } else if (type === 'hit') {
     const o = ac.createOscillator();
@@ -690,7 +853,7 @@ function playSfx(type) {
     const g = ac.createGain();
     g.gain.setValueAtTime(0.06, now);
     g.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
-    o.connect(g); g.connect(masterGain);
+    o.connect(g); g.connect(sfxDest);
     o.start(now); o.stop(now + 0.1);
   } else if (type === 'explode') {
     const bufLen = ac.sampleRate * 0.3;
@@ -704,7 +867,7 @@ function playSfx(type) {
     const g = ac.createGain();
     g.gain.setValueAtTime(0.15, now);
     g.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-    src.connect(f); f.connect(g); g.connect(masterGain);
+    src.connect(f); f.connect(g); g.connect(sfxDest);
     src.start(now); src.stop(now + 0.35);
   } else if (type === 'wave') {
     [400, 600, 800].forEach((f, i) => {
@@ -714,7 +877,7 @@ function playSfx(type) {
       g.gain.setValueAtTime(0, now + i * 0.08);
       g.gain.linearRampToValueAtTime(0.08, now + i * 0.08 + 0.03);
       g.gain.exponentialRampToValueAtTime(0.001, now + i * 0.08 + 0.2);
-      o.connect(g); g.connect(masterGain);
+      o.connect(g); g.connect(sfxDest);
       o.start(now + i * 0.08); o.stop(now + i * 0.08 + 0.25);
     });
   }
@@ -1087,11 +1250,13 @@ function towerShoot(tower, target, dt) {
 let enemyIdCounter = 0;
 function createEnemy(type, hpMult) {
   const def = ENEMY_DEFS[type];
+  const diffMult = (DIFF_PRESETS[settingDifficulty] || DIFF_PRESETS.normal).hpMult;
+  const totalMult = hpMult * diffMult;
   return {
     id: ++enemyIdCounter,
     type, ...def,
-    hp: Math.floor(def.hp * hpMult),
-    maxHp: Math.floor(def.hp * hpMult),
+    hp: Math.floor(def.hp * totalMult),
+    maxHp: Math.floor(def.hp * totalMult),
     speed: def.speed,
     baseSpeed: def.speed,
     pathProgress: 0,
@@ -4053,8 +4218,10 @@ function initGame() {
   projectiles = [];
   particles = [];
   towers.clear();
-  credits = 250;
-  lives = 20;
+  // Apply difficulty settings
+  const diff = DIFF_PRESETS[settingDifficulty] || DIFF_PRESETS.normal;
+  credits = diff.credits;
+  lives = diff.lives;
   score = 0;
   wave = 0;
   waveActive = false;
@@ -4080,6 +4247,7 @@ function initGame() {
   floatingTexts = [];
   autoWaveTimer = 0;
   shieldCharges = 0;
+  autoWave = settingAutoWave;
   // Reset abilities
   for (const ab of abilities) ab.timer = 0;
   // Reset tower locks
@@ -4091,19 +4259,107 @@ function initGame() {
 // ─── EVENT LISTENERS ─────────────────────────────
 window.addEventListener('resize', resize);
 
+// ─── MENU TABS & SETTINGS ────────────────────────
+(function initMenu() {
+  // Load saved settings from localStorage
+  try {
+    const saved = JSON.parse(localStorage.getItem('neonDefSettings') || '{}');
+    if (saved.musicVol !== undefined) settingMusicVol = saved.musicVol;
+    if (saved.sfxVol !== undefined) settingSfxVol = saved.sfxVol;
+    if (saved.difficulty) settingDifficulty = saved.difficulty;
+    if (saved.autoWave !== undefined) settingAutoWave = saved.autoWave;
+  } catch(e) {}
+
+  // Apply saved values to UI
+  const sliderMusic = document.getElementById('sliderMusic');
+  const sliderSfx = document.getElementById('sliderSfx');
+  sliderMusic.value = Math.round(settingMusicVol * 100);
+  sliderSfx.value = Math.round(settingSfxVol * 100);
+  document.getElementById('valMusic').textContent = Math.round(settingMusicVol * 100) + '%';
+  document.getElementById('valSfx').textContent = Math.round(settingSfxVol * 100) + '%';
+
+  // Difficulty buttons
+  document.querySelectorAll('.diff-btn[data-diff]').forEach(b => {
+    b.classList.toggle('active', b.dataset.diff === settingDifficulty);
+  });
+  document.getElementById('diffDesc').textContent = DIFF_PRESETS[settingDifficulty].label;
+
+  // Auto-wave button
+  const aw = document.getElementById('btnAutoWave');
+  aw.dataset.on = settingAutoWave ? 'true' : 'false';
+  aw.textContent = settingAutoWave ? 'ВКЛ' : 'ВЫКЛ';
+  aw.classList.toggle('active', settingAutoWave);
+
+  // Tab switching
+  document.querySelectorAll('.menu-tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+      document.querySelectorAll('.menu-tab').forEach(t => t.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      tab.classList.add('active');
+      document.getElementById(tab.dataset.tab).classList.add('active');
+    });
+  });
+
+  // Music volume slider
+  sliderMusic.addEventListener('input', () => {
+    settingMusicVol = sliderMusic.value / 100;
+    document.getElementById('valMusic').textContent = sliderMusic.value + '%';
+    if (musicGainNode) musicGainNode.gain.value = settingMusicVol * 0.45;
+    saveSettings();
+  });
+
+  // SFX volume slider
+  sliderSfx.addEventListener('input', () => {
+    settingSfxVol = sliderSfx.value / 100;
+    document.getElementById('valSfx').textContent = sliderSfx.value + '%';
+    if (sfxGainNode) sfxGainNode.gain.value = settingSfxVol * 0.5;
+    saveSettings();
+  });
+
+  // Difficulty buttons
+  document.querySelectorAll('.diff-btn[data-diff]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      settingDifficulty = btn.dataset.diff;
+      document.querySelectorAll('.diff-btn[data-diff]').forEach(b => b.classList.toggle('active', b === btn));
+      document.getElementById('diffDesc').textContent = DIFF_PRESETS[settingDifficulty].label;
+      saveSettings();
+    });
+  });
+
+  // Auto-wave toggle
+  aw.addEventListener('click', () => {
+    settingAutoWave = !settingAutoWave;
+    aw.dataset.on = settingAutoWave ? 'true' : 'false';
+    aw.textContent = settingAutoWave ? 'ВКЛ' : 'ВЫКЛ';
+    aw.classList.toggle('active', settingAutoWave);
+    saveSettings();
+  });
+
+  function saveSettings() {
+    try {
+      localStorage.setItem('neonDefSettings', JSON.stringify({
+        musicVol: settingMusicVol,
+        sfxVol: settingSfxVol,
+        difficulty: settingDifficulty,
+        autoWave: settingAutoWave
+      }));
+    } catch(e) {}
+  }
+})();
+
 document.getElementById('startBtn').addEventListener('click', () => {
   initAudio();
   document.getElementById('startScreen').style.display = 'none';
   initGame();
   gamePhase = 'playing';
-  waveBanner = { text: 'PLACE TOWERS & START WAVE!', alpha: 1, timer: 3 };
+  waveBanner = { text: 'РАССТАВЬ БАШНИ И ЗАПУСТИ ВОЛНУ!', alpha: 1, timer: 3 };
 });
 
 document.getElementById('restartBtn').addEventListener('click', () => {
   document.getElementById('gameOverScreen').style.display = 'none';
   initGame();
   gamePhase = 'playing';
-  waveBanner = { text: 'PLACE TOWERS & START WAVE!', alpha: 1, timer: 3 };
+  waveBanner = { text: 'РАССТАВЬ БАШНИ И ЗАПУСТИ ВОЛНУ!', alpha: 1, timer: 3 };
 });
 
 // ─── TOUCH / MOBILE SUPPORT ──────────────────────
