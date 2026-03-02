@@ -67,36 +67,49 @@ const WAYPOINTS = [
 ];
 
 const TOWER_DEFS = {
-  laser:  { name:'LASER',  cost:50,  range:3,   dmg:15,  rate:0.4,  color:'#00ffff', desc:'Fast beam',   locked:false },
-  plasma: { name:'PLASMA', cost:100, range:2.5, dmg:45,  rate:1.2,  color:'#ff00ff', desc:'AoE splash',  locked:false },
-  tesla:  { name:'TESLA',  cost:150, range:3.5, dmg:20,  rate:0.8,  color:'#aa44ff', desc:'Chain zap',   locked:false },
-  cryo:   { name:'CRYO',   cost:75,  range:2.8, dmg:8,   rate:0.6,  color:'#4488ff', desc:'Slow enemy',  locked:false },
-  flame:  { name:'FLAME',  cost:120, range:2,   dmg:35,  rate:0.3,  color:'#ff6600', desc:'Burn area',   locked:true },
-  sniper: { name:'SNIPER', cost:200, range:5,   dmg:120, rate:2.5,  color:'#88ff44', desc:'Long range',  locked:true },
-  pulse:  { name:'PULSE',  cost:180, range:3,   dmg:30,  rate:1.0,  color:'#ff44aa', desc:'Push back',   locked:true },
-  void:   { name:'VOID',   cost:300, range:2.5, dmg:60,  rate:1.5,  color:'#aa00ff', desc:'% HP dmg',    locked:true }
+  laser:   { name:'LASER',   cost:50,  range:3,   dmg:15,  rate:0.4,  color:'#00ffff', desc:'Fast beam',   locked:false },
+  plasma:  { name:'PLASMA',  cost:100, range:2.5, dmg:45,  rate:1.2,  color:'#ff00ff', desc:'AoE splash',  locked:false },
+  tesla:   { name:'TESLA',   cost:150, range:3.5, dmg:20,  rate:0.8,  color:'#aa44ff', desc:'Chain zap',   locked:false },
+  cryo:    { name:'CRYO',    cost:75,  range:2.8, dmg:8,   rate:0.6,  color:'#4488ff', desc:'Slow enemy',  locked:false },
+  flame:   { name:'FLAME',   cost:120, range:2.2, dmg:18,  rate:0.15, color:'#ff6600', desc:'Cone fire',   locked:true },
+  sniper:  { name:'SNIPER',  cost:200, range:5,   dmg:120, rate:2.5,  color:'#88ff44', desc:'Long range',  locked:true },
+  pulse:   { name:'PULSE',   cost:180, range:3,   dmg:30,  rate:1.0,  color:'#ff44aa', desc:'Push back',   locked:true },
+  void:    { name:'VOID',    cost:300, range:2.5, dmg:60,  rate:1.5,  color:'#aa00ff', desc:'% HP dmg',    locked:true },
+  mortar:  { name:'MORTAR',  cost:250, range:5.5, dmg:80,  rate:2.8,  color:'#ff8844', desc:'Huge AoE',    locked:true },
+  poison:  { name:'POISON',  cost:160, range:3,   dmg:12,  rate:0.8,  color:'#44ff44', desc:'Spread DOT',  locked:true },
+  railgun: { name:'RAILGUN', cost:350, range:6,   dmg:200, rate:3.5,  color:'#ffff44', desc:'Piercing',    locked:true }
 };
 
 // ─── TECH TREE ───────────────────────────────────
 const TECH_TREE = [
-  // ═══ ROW 0 — Tier 1 (base) ═══
-  { id:'flame',  name:'FLAME TOWER',    unlocks:'flame',  cost:80,  requires:null,     col:0, row:0, color:'#ff6600', desc:'Unlocks Flame Tower — burns enemies in area' },
-  { id:'sniper', name:'SNIPER TOWER',   unlocks:'sniper', cost:100, requires:null,     col:1, row:0, color:'#88ff44', desc:'Unlocks Sniper — extreme range, high damage' },
-  { id:'dmg1',   name:'DAMAGE +20%',    unlocks:null,     cost:60,  requires:null,     col:2, row:0, color:'#ffcc00', desc:'All towers deal 20% more damage' },
-  { id:'range1', name:'RANGE +15%',     unlocks:null,     cost:60,  requires:null,     col:3, row:0, color:'#00ffcc', desc:'All towers get 15% more range' },
-  { id:'econ1',  name:'INCOME +25%',    unlocks:null,     cost:70,  requires:null,     col:4, row:0, color:'#ffaa00', desc:'Kill rewards increased by 25%' },
-  // ═══ ROW 1 — Tier 2 (requires tier 1) ═══
-  { id:'pulse',  name:'PULSE TOWER',    unlocks:'pulse',  cost:150, requires:'flame',  col:0, row:1, color:'#ff44aa', desc:'Unlocks Pulse — pushes enemies back' },
-  { id:'void',   name:'VOID TOWER',     unlocks:'void',   cost:200, requires:'sniper', col:1, row:1, color:'#aa00ff', desc:'Unlocks Void — deals % of max HP' },
-  { id:'dmg2',   name:'DAMAGE +30%',    unlocks:null,     cost:150, requires:'dmg1',   col:2, row:1, color:'#ffdd44', desc:'All towers deal 30% more damage' },
-  { id:'rate1',  name:'FIRE RATE +20%', unlocks:null,     cost:150, requires:'range1', col:3, row:1, color:'#44ffcc', desc:'All towers fire 20% faster' },
-  { id:'reveal', name:'STEALTH SCAN',   unlocks:null,     cost:120, requires:'econ1',  col:4, row:1, color:'#88aaff', desc:'All towers detect stealth enemies' },
-  // ═══ ROW 2 — Tier 3 (requires tier 2) ═══
-  { id:'burn',   name:'BURN DOT',       unlocks:null,     cost:250, requires:'pulse',  col:0, row:2, color:'#ff4400', desc:'Flame & Pulse set enemies on fire (DOT)' },
-  { id:'crit',   name:'CRIT ×2',        unlocks:null,     cost:250, requires:'void',   col:1, row:2, color:'#ff00aa', desc:'15% chance to deal double damage' },
-  { id:'dmg3',   name:'DAMAGE +50%',    unlocks:null,     cost:300, requires:'dmg2',   col:2, row:2, color:'#ffee66', desc:'All towers deal 50% more damage' },
-  { id:'multi',  name:'MULTISHOT',      unlocks:null,     cost:280, requires:'rate1',  col:3, row:2, color:'#66ffdd', desc:'Laser & Sniper hit 1 extra target' },
-  { id:'regen',  name:'REGENERATION',   unlocks:null,     cost:200, requires:'reveal', col:4, row:2, color:'#66aaff', desc:'+1 life every 3 waves cleared' }
+  // ═══ ROW 0 — Tier 1 (base, no requirements) ═══
+  { id:'flame',   name:'FLAME TOWER',    unlocks:'flame',   cost:80,  requires:null,      col:0, row:0, color:'#ff6600', desc:'Flamethrower — cone spray, fast burn' },
+  { id:'sniper',  name:'SNIPER TOWER',   unlocks:'sniper',  cost:100, requires:null,      col:1, row:0, color:'#88ff44', desc:'Extreme range, high single-target dmg' },
+  { id:'dmg1',    name:'DAMAGE +20%',    unlocks:null,      cost:60,  requires:null,      col:2, row:0, color:'#ffcc00', desc:'All towers deal 20% more damage' },
+  { id:'range1',  name:'RANGE +15%',     unlocks:null,      cost:60,  requires:null,      col:3, row:0, color:'#00ffcc', desc:'All towers get 15% more range' },
+  { id:'econ1',   name:'INCOME +25%',    unlocks:null,      cost:70,  requires:null,      col:4, row:0, color:'#ffaa00', desc:'Kill rewards increased by 25%' },
+  { id:'poison',  name:'POISON TOWER',   unlocks:'poison',  cost:90,  requires:null,      col:5, row:0, color:'#44ff44', desc:'Poison DOT that spreads to nearby' },
+  // ═══ ROW 1 — Tier 2 ═══
+  { id:'pulse',   name:'PULSE TOWER',    unlocks:'pulse',   cost:150, requires:'flame',   col:0, row:1, color:'#ff44aa', desc:'Shockwave pushes enemies back' },
+  { id:'void',    name:'VOID TOWER',     unlocks:'void',    cost:200, requires:'sniper',  col:1, row:1, color:'#aa00ff', desc:'Deals % of max HP as damage' },
+  { id:'dmg2',    name:'DAMAGE +30%',    unlocks:null,      cost:150, requires:'dmg1',    col:2, row:1, color:'#ffdd44', desc:'All towers deal 30% more damage' },
+  { id:'rate1',   name:'FIRE RATE +20%', unlocks:null,      cost:150, requires:'range1',  col:3, row:1, color:'#44ffcc', desc:'All towers fire 20% faster' },
+  { id:'reveal',  name:'STEALTH SCAN',   unlocks:null,      cost:120, requires:'econ1',   col:4, row:1, color:'#88aaff', desc:'All towers detect stealth enemies' },
+  { id:'mortar',  name:'MORTAR TOWER',   unlocks:'mortar',  cost:180, requires:'poison',  col:5, row:1, color:'#ff8844', desc:'Long-range explosive shells, huge AoE' },
+  // ═══ ROW 2 — Tier 3 ═══
+  { id:'burn',    name:'BURN DOT',       unlocks:null,      cost:250, requires:'pulse',   col:0, row:2, color:'#ff4400', desc:'Flame & Pulse set enemies on fire' },
+  { id:'crit',    name:'CRIT ×2',        unlocks:null,      cost:250, requires:'void',    col:1, row:2, color:'#ff00aa', desc:'15% chance to deal double damage' },
+  { id:'dmg3',    name:'DAMAGE +50%',    unlocks:null,      cost:300, requires:'dmg2',    col:2, row:2, color:'#ffee66', desc:'All towers deal 50% more damage' },
+  { id:'multi',   name:'MULTISHOT',      unlocks:null,      cost:280, requires:'rate1',   col:3, row:2, color:'#66ffdd', desc:'Laser & Sniper hit 1 extra target' },
+  { id:'regen',   name:'REGENERATION',   unlocks:null,      cost:200, requires:'reveal',  col:4, row:2, color:'#66aaff', desc:'+1 life every 3 waves cleared' },
+  { id:'railgun', name:'RAILGUN TOWER',  unlocks:'railgun', cost:300, requires:'mortar',  col:5, row:2, color:'#ffff44', desc:'Piercing beam hits ALL in a line' },
+  // ═══ ROW 3 — Tier 4 (ultimate) ═══
+  { id:'inferno', name:'INFERNO',        unlocks:null,      cost:400, requires:'burn',    col:0, row:3, color:'#ff2200', desc:'Flame cone +40% wider, 2x DOT' },
+  { id:'execute', name:'EXECUTE',        unlocks:null,      cost:400, requires:'crit',    col:1, row:3, color:'#ff0066', desc:'Enemies below 20% HP die instantly' },
+  { id:'fortress',name:'FORTRESS',       unlocks:null,      cost:350, requires:'dmg3',    col:2, row:3, color:'#ffcc00', desc:'Towers +15% dmg per upgrade level' },
+  { id:'overdrive',name:'OVERDRIVE',     unlocks:null,      cost:350, requires:'multi',   col:3, row:3, color:'#00ffaa', desc:'All towers fire 30% faster' },
+  { id:'armor',   name:'ARMOR BREAK',    unlocks:null,      cost:300, requires:'regen',   col:4, row:3, color:'#aaccff', desc:'Towers shred 20% enemy armor' },
+  { id:'nuke',    name:'ORBITAL',        unlocks:null,      cost:500, requires:'railgun', col:5, row:3, color:'#ffff00', desc:'Railgun shots explode for AoE' }
 ];
 let unlockedTech = new Set();
 let techPoints = 0; // earned per wave
@@ -898,21 +911,43 @@ function towerShoot(tower, target, dt) {
     target.slowFactor = 0.4;
     spawnParticles(target.x, target.y, '#88ccff', 3, 30, 0.3);
   } else if (tower.type === 'flame') {
-    // Area burn — damages all enemies in range
+    // Cone flamethrower — damages enemies within a ~60° cone in firing direction
+    const coneAngle = unlockedTech.has('inferno') ? Math.PI / 2.2 : Math.PI / 3;   // ~60° or ~82° with Inferno
+    const fireAngle = Math.atan2(target.y - tower.y, target.x - tower.x);
+    tower.angle = fireAngle; // update visual aim
+    const dotMult = unlockedTech.has('inferno') ? 2 : 1;
     for (const e of enemies) {
       if (e.dead) continue;
-      const d = Math.hypot(e.x - tower.x, e.y - tower.y);
-      if (d <= tower.range) {
+      const dx = e.x - tower.x, dy = e.y - tower.y;
+      const d = Math.hypot(dx, dy);
+      if (d > tower.range) continue;
+      const angleToEnemy = Math.atan2(dy, dx);
+      let diff = angleToEnemy - fireAngle;
+      while (diff > Math.PI) diff -= Math.PI * 2;
+      while (diff < -Math.PI) diff += Math.PI * 2;
+      if (Math.abs(diff) <= coneAngle / 2) {
         dealDamage(e, tower.dmg, 'flame');
-        spawnParticles(e.x, e.y, '#ff6600', 2, 40, 0.2);
+        if (unlockedTech.has('burn')) {
+          e.burnTimer = 2 * dotMult;
+          e.burnDps = 8 * dotMult;
+        }
+        spawnParticles(e.x, e.y, '#ff6600', 1, 30, 0.15);
       }
     }
-    // Flame burst beam visual
-    beams.push({
-      x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
-      color: '#ff6600', life: 0.12, maxLife: 0.12, width: 4 + tower.level
-    });
-    spawnParticles(tower.x, tower.y, '#ffaa00', 4, 60, 0.3);
+    // Flame cone visual — multiple flame lines within cone
+    for (let i = -2; i <= 2; i++) {
+      const a = fireAngle + (i / 2) * (coneAngle / 2) * 0.8;
+      const len = tower.range * (0.7 + Math.random() * 0.3);
+      beams.push({
+        x1: tower.x, y1: tower.y,
+        x2: tower.x + Math.cos(a) * len, y2: tower.y + Math.sin(a) * len,
+        color: i === 0 ? '#ffff00' : '#ff6600', life: 0.1, maxLife: 0.1,
+        width: 3 + tower.level - Math.abs(i) * 0.5
+      });
+    }
+    spawnParticles(tower.x + Math.cos(fireAngle) * tower.range * 0.4,
+                   tower.y + Math.sin(fireAngle) * tower.range * 0.4,
+                   '#ffaa00', 5, 50, 0.25);
   } else if (tower.type === 'sniper') {
     // High damage single target
     dealDamage(target, tower.dmg, 'sniper');
@@ -956,6 +991,92 @@ function towerShoot(tower, target, dt) {
       color: '#aa00ff', life: 0.2, maxLife: 0.2, width: 3, tesla: true
     });
     spawnParticles(target.x, target.y, '#aa00ff', 4, 50, 0.4);
+  } else if (tower.type === 'mortar') {
+    // Mortar — lobbed explosive shell, huge AoE
+    const splashR = cellSize * 2.5;
+    const nukeAoE = unlockedTech.has('nuke'); // Orbital tech: railgun & mortar explode bigger
+    const radius = nukeAoE ? splashR * 1.4 : splashR;
+    // Arc projectile visual — spawn explosion at target
+    for (const e of enemies) {
+      if (e.dead) continue;
+      const d = Math.hypot(e.x - target.x, e.y - target.y);
+      if (d <= radius) {
+        const falloff = 1 - (d / radius) * 0.5; // 50-100% damage within radius
+        dealDamage(e, Math.floor(tower.dmg * falloff), 'mortar');
+        spawnParticles(e.x, e.y, '#ff8844', 2, 40, 0.2);
+      }
+    }
+    // Explosion visual — expanding ring beam
+    beams.push({
+      x1: target.x, y1: target.y, x2: target.x + 1, y2: target.y + 1,
+      color: '#ff8844', life: 0.35, maxLife: 0.35, width: radius * 0.15, mortar: true
+    });
+    // Arc trail from tower to target
+    beams.push({
+      x1: tower.x, y1: tower.y - 15, x2: target.x, y2: target.y,
+      color: '#ffcc66', life: 0.25, maxLife: 0.25, width: 2
+    });
+    spawnParticles(target.x, target.y, '#ffaa44', 10, 80, 0.4);
+    spawnParticles(target.x, target.y, '#ff4400', 6, 60, 0.3);
+  } else if (tower.type === 'poison') {
+    // Poison — applies DOT that spreads to nearby enemies
+    dealDamage(target, tower.dmg, 'poison');
+    target.poisonTimer = 4;
+    target.poisonDps = 6 + tower.level * 2;
+    beams.push({
+      x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
+      color: '#44ff44', life: 0.12, maxLife: 0.12, width: 2.5
+    });
+    spawnParticles(target.x, target.y, '#44ff44', 4, 40, 0.3);
+    // Poison spread — infect nearby enemies within 1 cell
+    for (const e of enemies) {
+      if (e.dead || e.id === target.id) continue;
+      const d = Math.hypot(e.x - target.x, e.y - target.y);
+      if (d < cellSize * 1.2) {
+        e.poisonTimer = Math.max(e.poisonTimer || 0, 2);
+        e.poisonDps = Math.max(e.poisonDps || 0, 4 + tower.level);
+        spawnParticles(e.x, e.y, '#22cc22', 2, 25, 0.2);
+      }
+    }
+  } else if (tower.type === 'railgun') {
+    // Railgun — piercing beam hits ALL enemies in a line
+    const angle = Math.atan2(target.y - tower.y, target.x - tower.x);
+    const beamLen = tower.range * 1.5;
+    const endX = tower.x + Math.cos(angle) * beamLen;
+    const endY = tower.y + Math.sin(angle) * beamLen;
+    const nukeAoE = unlockedTech.has('nuke');
+    // Check all enemies along the line
+    for (const e of enemies) {
+      if (e.dead) continue;
+      // Distance from point to line segment
+      const dx = endX - tower.x, dy = endY - tower.y;
+      const len2 = dx * dx + dy * dy;
+      let t = ((e.x - tower.x) * dx + (e.y - tower.y) * dy) / len2;
+      t = Math.max(0, Math.min(1, t));
+      const projX = tower.x + t * dx, projY = tower.y + t * dy;
+      const dist = Math.hypot(e.x - projX, e.y - projY);
+      if (dist < cellSize * 0.6) {
+        dealDamage(e, tower.dmg, 'railgun');
+        spawnParticles(e.x, e.y, '#ffff44', 3, 50, 0.25);
+        // Nuke tech: explosions on hit
+        if (nukeAoE) {
+          for (const e2 of enemies) {
+            if (e2.dead || e2.id === e.id) continue;
+            if (Math.hypot(e2.x - e.x, e2.y - e.y) < cellSize * 1.5) {
+              dealDamage(e2, Math.floor(tower.dmg * 0.3), 'railgun');
+            }
+          }
+          spawnParticles(e.x, e.y, '#ff8800', 5, 60, 0.3);
+        }
+      }
+    }
+    // Piercing beam visual
+    beams.push({
+      x1: tower.x, y1: tower.y, x2: endX, y2: endY,
+      color: '#ffff44', life: 0.2, maxLife: 0.2, width: 3 + tower.level, railgun: true
+    });
+    // Muzzle flash
+    spawnParticles(tower.x, tower.y, '#ffffff', 4, 40, 0.15);
   }
 }
 
@@ -980,6 +1101,9 @@ function createEnemy(type, hpMult) {
     stealth: def.stealth || false,
     burnTimer: 0,
     burnDmg: 0,
+    poisonTimer: 0,
+    poisonDps: 0,
+    armorShred: 0,
     isMini: false,
     spawnedMinions: false,
     stunTimer: 0
@@ -991,11 +1115,30 @@ function dealDamage(enemy, dmg, towerType) {
   // Crit chance from tech
   let finalDmg = dmg;
   let isCrit = false;
+  // Fortress tech: +15% dmg per tower upgrade level
+  if (unlockedTech.has('fortress') && towerType) {
+    // We pass level info through dmg already via multiplier, add flat 15% per approx level
+    finalDmg = Math.floor(finalDmg * 1.15);
+  }
+  // Armor Break tech: shred 20% resistance
+  if (unlockedTech.has('armor') && enemy.armorShred < 5) {
+    enemy.armorShred = Math.min(5, (enemy.armorShred || 0) + 1);
+  }
+  if (enemy.armorShred > 0) {
+    finalDmg = Math.floor(finalDmg * (1 + enemy.armorShred * 0.04)); // up to +20% with 5 stacks
+  }
   if (unlockedTech.has('crit') && Math.random() < 0.15) {
-    finalDmg = Math.floor(dmg * 2);
+    finalDmg = Math.floor(finalDmg * 2);
     isCrit = true;
   }
   enemy.hp -= finalDmg;
+  // Execute tech: enemies below 20% HP die instantly
+  if (unlockedTech.has('execute') && enemy.hp > 0 && enemy.hp < enemy.maxHp * 0.2) {
+    finalDmg += enemy.hp;
+    enemy.hp = 0;
+    isCrit = true; // show as crit for visual
+    spawnParticles(enemy.x, enemy.y, '#ff0066', 6, 60, 0.3);
+  }
   // Burn DOT from tech (flame & pulse)
   if (unlockedTech.has('burn') && (towerType === 'flame' || towerType === 'pulse')) {
     enemy.burnTimer = 3; // 3 seconds of DOT
@@ -1276,7 +1419,7 @@ function update(dt) {
     // Burn DOT tick
     if (e.burnTimer > 0) {
       e.burnTimer -= dt;
-      if (Math.random() < dt * 3) { // ~3 ticks per second
+      if (Math.random() < dt * 3) {
         e.hp -= e.burnDmg;
         spawnParticles(e.x, e.y, '#ff4400', 1, 20, 0.15);
         if (e.hp <= 0 && !e.dead) {
@@ -1288,7 +1431,34 @@ function update(dt) {
           credits += reward; creditsEarned += reward;
           score += reward * 2;
           spawnExplosion(e.x, e.y, e.color, false);
-          spawnFloatingText(e.x, e.y - 15, '+' + reward + '\\u00A2', '#ffcc00', 13);
+          spawnFloatingText(e.x, e.y - 15, '+' + reward + '\u00A2', '#ffcc00', 13);
+        }
+      }
+    }
+    // Poison DOT tick
+    if (e.poisonTimer > 0) {
+      e.poisonTimer -= dt;
+      if (Math.random() < dt * 4) { // ~4 ticks per second
+        e.hp -= (e.poisonDps || 4);
+        spawnParticles(e.x, e.y, '#44ff44', 1, 15, 0.12);
+        // Poison spreads to nearby enemies
+        for (const e2 of enemies) {
+          if (e2.dead || e2.id === e.id) continue;
+          if (Math.hypot(e2.x - e.x, e2.y - e.y) < cellSize * 1.0 && (e2.poisonTimer || 0) <= 0) {
+            e2.poisonTimer = 1.5;
+            e2.poisonDps = Math.max(e2.poisonDps || 0, Math.floor((e.poisonDps || 4) * 0.6));
+          }
+        }
+        if (e.hp <= 0 && !e.dead) {
+          e.dead = true;
+          comboCount++; comboTimer = COMBO_TIMEOUT;
+          if (comboCount > maxCombo) maxCombo = comboCount;
+          totalKills++;
+          const reward = Math.floor(e.reward * getTechRewardMultiplier());
+          credits += reward; creditsEarned += reward;
+          score += reward * 2;
+          spawnExplosion(e.x, e.y, e.color, false);
+          spawnFloatingText(e.x, e.y - 15, '+' + reward + '\u00A2', '#ffcc00', 13);
         }
       }
     }
@@ -1790,15 +1960,15 @@ function drawSkyView(W, H) {
   const nodeH = nodeW < 90 ? 50 : 65;
   const gapX = nodeW + (nodeW < 90 ? 6 : 14);
   const gapY = nodeH + (nodeW < 90 ? 18 : 35);
-  const treeCols = 5;
-  const treeRows = 3;
+  const treeCols = 6;
+  const treeRows = 4;
   const treeW = treeCols * gapX - (gapX - nodeW);
   const treeBaseX = (W - treeW) / 2;
   const treeBaseY = H * 0.30;
 
   // Tier labels on the left
-  const tierLabels = ['TIER 1', 'TIER 2', 'TIER 3'];
-  const tierColors = ['#00ffcc', '#ff00ff', '#ff4400'];
+  const tierLabels = ['TIER 1', 'TIER 2', 'TIER 3', 'TIER 4'];
+  const tierColors = ['#00ffcc', '#ff00ff', '#ff4400', '#ffff00'];
   for (let r = 0; r < treeRows; r++) {
     const ly = treeBaseY + r * gapY + nodeH / 2;
     ctx.font = 'bold 11px monospace';
@@ -1942,7 +2112,13 @@ function drawSkyView(W, H) {
                    tech.id === 'burn' ? '\u{1F525}' :
                    tech.id === 'crit' ? '\u{1F480}' :
                    tech.id === 'multi' ? '\u{1F4AB}' :
-                   tech.id === 'regen' ? '\u{2764}\uFE0F' : '\u2B06';
+                   tech.id === 'regen' ? '\u{2764}\uFE0F' :
+                   tech.id === 'inferno' ? '\u{1F525}' :
+                   tech.id === 'execute' ? '\u2620\uFE0F' :
+                   tech.id === 'fortress' ? '\u{1F3F0}' :
+                   tech.id === 'overdrive' ? '\u26A1' :
+                   tech.id === 'armor' ? '\u{1F6E1}\uFE0F' :
+                   tech.id === 'nuke' ? '\u2622\uFE0F' : '\u2B06';
       ctx.fillText(icon, iconX, iconY);
     }
     ctx.globalAlpha = 1;
@@ -2677,6 +2853,116 @@ function drawTowerShape(cx, cy, type, color, size, angle, level) {
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.35, 0, Math.PI * 2);
     ctx.stroke();
+
+  } else if (type === 'mortar') {
+    // Mortar — heavy barrel with blast ring
+    ctx.fillStyle = color + '22';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    // Thick barrel pointing up
+    ctx.fillRect(-size * 0.35, -size * 1.2, size * 0.7, size * 1.4);
+    ctx.strokeRect(-size * 0.35, -size * 1.2, size * 0.7, size * 1.4);
+    // Base platform
+    ctx.fillRect(-size * 0.7, size * 0.1, size * 1.4, size * 0.4);
+    ctx.strokeRect(-size * 0.7, size * 0.1, size * 1.4, size * 0.4);
+    // Muzzle opening
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.ellipse(0, -size * 1.2, size * 0.28, size * 0.12, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = color;
+    ctx.stroke();
+    // Blast ring effect
+    const blastR = size * (0.7 + Math.sin(gameTime * 6) * 0.15);
+    ctx.globalAlpha = 0.3 + Math.sin(gameTime * 4) * 0.15;
+    ctx.strokeStyle = '#ff8844';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.arc(0, 0, blastR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+    // Center core glow
+    const mortarCore = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.25);
+    mortarCore.addColorStop(0, '#ffffff');
+    mortarCore.addColorStop(0.4, color);
+    mortarCore.addColorStop(1, color + '00');
+    ctx.fillStyle = mortarCore;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+
+  } else if (type === 'poison') {
+    // Poison — biohazard shape with dripping effect
+    ctx.fillStyle = color + '22';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    // Three overlapping circles (biohazard symbol)
+    for (let i = 0; i < 3; i++) {
+      const a = i * Math.PI * 2 / 3 - Math.PI / 2;
+      const cx = Math.cos(a) * size * 0.4;
+      const cy = Math.sin(a) * size * 0.4;
+      ctx.beginPath();
+      ctx.arc(cx, cy, size * 0.45, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+    // Center dot
+    const poisonCore = ctx.createRadialGradient(0, 0, 0, 0, 0, size * 0.3);
+    poisonCore.addColorStop(0, '#ffffff');
+    poisonCore.addColorStop(0.3, color);
+    poisonCore.addColorStop(1, color + '00');
+    ctx.fillStyle = poisonCore;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.22, 0, Math.PI * 2);
+    ctx.fill();
+    // Dripping particles
+    for (let i = 0; i < 3; i++) {
+      const dropY = size * (0.6 + ((gameTime * 1.5 + i * 0.7) % 1) * 0.8);
+      const dropX = (i - 1) * size * 0.35;
+      ctx.globalAlpha = 1 - ((gameTime * 1.5 + i * 0.7) % 1);
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(dropX, dropY, 2, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+  } else if (type === 'railgun') {
+    // Railgun — long dual-rail with energy between them
+    ctx.fillStyle = color + '22';
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 2;
+    // Two parallel rails
+    ctx.fillRect(-size * 0.15, -size * 1.6, size * 0.12, size * 3.2);
+    ctx.strokeRect(-size * 0.15, -size * 1.6, size * 0.12, size * 3.2);
+    ctx.fillRect(size * 0.03, -size * 1.6, size * 0.12, size * 3.2);
+    ctx.strokeRect(size * 0.03, -size * 1.6, size * 0.12, size * 3.2);
+    // Energy crackling between rails
+    ctx.strokeStyle = '#ffff88';
+    ctx.lineWidth = 1;
+    for (let i = 0; i < 5; i++) {
+      const ey = -size * 1.4 + i * size * 0.6;
+      const jitter = Math.sin(gameTime * 12 + i * 2.5) * size * 0.08;
+      ctx.beginPath();
+      ctx.moveTo(-size * 0.03, ey);
+      ctx.lineTo(jitter, ey + size * 0.15);
+      ctx.lineTo(size * 0.03, ey + size * 0.3);
+      ctx.stroke();
+    }
+    // Muzzle glow at the tip
+    const railGlow = ctx.createRadialGradient(0, -size * 1.6, 0, 0, -size * 1.6, size * 0.35);
+    railGlow.addColorStop(0, '#ffffff');
+    railGlow.addColorStop(0.3, color);
+    railGlow.addColorStop(1, color + '00');
+    ctx.fillStyle = railGlow;
+    ctx.beginPath();
+    ctx.arc(0, -size * 1.6, size * 0.25 + Math.sin(gameTime * 8) * 2, 0, Math.PI * 2);
+    ctx.fill();
+    // Base housing
+    ctx.fillStyle = color + '33';
+    ctx.strokeStyle = color;
+    ctx.fillRect(-size * 0.4, size * 0.8, size * 0.8, size * 0.5);
+    ctx.strokeRect(-size * 0.4, size * 0.8, size * 0.8, size * 0.5);
   }
   ctx.restore();
 }
@@ -2792,6 +3078,19 @@ function drawEnemy(e) {
     for (let i = 0; i < 3; i++) {
       const sa = gameTime * 4 + i * Math.PI * 2 / 3;
       ctx.fillText('\u2605', Math.cos(sa) * size * 1.3, Math.sin(sa) * size * 1.3 - 4);
+    }
+    ctx.globalAlpha = 1;
+  }
+  // Poison visual
+  if (e.poisonTimer > 0) {
+    ctx.fillStyle = '#44ff44';
+    ctx.globalAlpha = 0.4 + Math.sin(gameTime * 8) * 0.2;
+    for (let i = 0; i < 4; i++) {
+      const pa = gameTime * 3 + i * Math.PI / 2;
+      const pr = size * 1.1;
+      ctx.beginPath();
+      ctx.arc(Math.cos(pa) * pr, Math.sin(pa) * pr, 2, 0, Math.PI * 2);
+      ctx.fill();
     }
     ctx.globalAlpha = 1;
   }
@@ -3265,7 +3564,8 @@ function getTechRangeMultiplier() {
 }
 function getTechRateMultiplier() {
   let m = 1;
-  if (unlockedTech.has('rate1')) m *= 0.8; // lower = faster
+  if (unlockedTech.has('rate1')) m *= 0.8;
+  if (unlockedTech.has('overdrive')) m *= 0.7; // Overdrive: 30% faster
   return m;
 }
 function getTechRewardMultiplier() {
@@ -3661,7 +3961,7 @@ function initGame() {
   for (const ab of abilities) ab.timer = 0;
   // Reset tower locks
   for (const key of Object.keys(TOWER_DEFS)) {
-    TOWER_DEFS[key].locked = ['flame','sniper','pulse','void'].includes(key);
+    TOWER_DEFS[key].locked = ['flame','sniper','pulse','void','mortar','poison','railgun'].includes(key);
   }
 }
 
