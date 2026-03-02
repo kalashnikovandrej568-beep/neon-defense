@@ -60,6 +60,9 @@ const ctx = canvas.getContext('2d');
 // ─── CONFIG ──────────────────────────────────────
 const COLS = 20, ROWS = 12;
 const PANEL_H = 110;
+function getMobilePanelH() {
+  return (isMobile && logicalW < 600) ? 130 : PANEL_H;
+}
 const BPM = 100;
 
 const WAYPOINTS = [
@@ -251,7 +254,7 @@ function resize() {
   canvas.style.width = logicalW + 'px';
   canvas.style.height = logicalH + 'px';
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  const playH = logicalH - PANEL_H;
+  const playH = logicalH - getMobilePanelH();
   cellSize = Math.min(logicalW / COLS, playH / ROWS);
   gridW = cellSize * COLS;
   gridH = cellSize * ROWS;
@@ -1813,6 +1816,20 @@ function render() {
   // Camera indicator arrows
   drawCameraHint(W, H);
 
+  // Tap feedback ripple (mobile)
+  if (tapFeedback && tapFeedback.timer > 0) {
+    const tf = tapFeedback;
+    const progress = 1 - tf.timer / tf.maxTimer;
+    const rippleR = 8 + progress * 30;
+    ctx.globalAlpha = (1 - progress) * 0.6;
+    ctx.strokeStyle = tf.color;
+    ctx.lineWidth = 2 * (1 - progress);
+    ctx.beginPath();
+    ctx.arc(tf.x, tf.y, rippleR, 0, Math.PI * 2);
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+  }
+
   ctx.restore();
 }
 
@@ -2214,27 +2231,30 @@ function drawCameraHint(W, H) {
 
   // Mobile camera toggle button (always visible on touch devices)
   if (isMobile) {
-    const btnW = 44, btnH = 44;
-    const btnX = W - btnW - 10;
-    const btnY = 10;
-    // Background
-    ctx.fillStyle = 'rgba(10,0,25,0.8)';
-    ctx.strokeStyle = camYSmooth > 0.5 ? '#ff00ff88' : '#00ffff88';
-    ctx.lineWidth = 2;
+    const btnR = 26; // radius for bigger tap target
+    const btnX = W - btnR - 12;
+    const btnY = H * 0.5; // centered vertically on screen
+    // Background circle with glow
+    ctx.fillStyle = 'rgba(10,0,25,0.85)';
+    ctx.strokeStyle = camYSmooth > 0.5 ? '#ff00ffaa' : '#00ffffaa';
+    ctx.lineWidth = 2.5;
+    ctx.shadowColor = camYSmooth > 0.5 ? '#ff00ff' : '#00ffff';
+    ctx.shadowBlur = 10;
     ctx.beginPath();
-    ctx.arc(btnX + btnW / 2, btnY + btnH / 2, btnW / 2, 0, Math.PI * 2);
+    ctx.arc(btnX, btnY, btnR, 0, Math.PI * 2);
     ctx.fill();
     ctx.stroke();
+    ctx.shadowBlur = 0;
     // Icon
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.font = 'bold 20px monospace';
+    ctx.font = 'bold 22px monospace';
     ctx.fillStyle = camYSmooth > 0.5 ? '#ff00ff' : '#00ffff';
-    ctx.fillText(camYSmooth > 0.5 ? '⚔' : '⚡', btnX + btnW / 2, btnY + btnH / 2);
-    // Label
-    ctx.font = '9px monospace';
-    ctx.fillText(camYSmooth > 0.5 ? 'BATTLE' : 'TECH', btnX + btnW / 2, btnY + btnH + 8);
-    mobileCamBtn = { x: btnX - 4, y: btnY - 4, w: btnW + 8, h: btnH + 8 };
+    ctx.fillText(camYSmooth > 0.5 ? '\u2694' : '\u26A1', btnX, btnY - 1);
+    // Label below
+    ctx.font = 'bold 9px monospace';
+    ctx.fillText(camYSmooth > 0.5 ? 'BATTLE' : 'TECH', btnX, btnY + btnR + 10);
+    mobileCamBtn = { x: btnX - btnR - 6, y: btnY - btnR - 6, w: (btnR + 6) * 2, h: (btnR + 6) * 2 };
   } else {
     mobileCamBtn = null;
   }
@@ -3191,40 +3211,51 @@ function drawProjectile(p) {
 
 function drawHUD() {
   const W = logicalW, H = logicalH;
+  const mob = isMobile && W < 600;  // compact mobile layout
+  const fSize = mob ? 13 : 16;
   ctx.textBaseline = 'top';
-  ctx.font = 'bold 16px "Segoe UI", monospace';
+  ctx.font = 'bold ' + fSize + 'px "Segoe UI", monospace';
   
   // Credits
   ctx.textAlign = 'left';
   ctx.fillStyle = '#ffcc00';
-  ctx.fillText('⬡ ' + credits, 20, 15);
+  ctx.fillText('\u2B21 ' + credits, mob ? 8 : 20, mob ? 18 : 15);
   
   // Lives
   ctx.fillStyle = '#ff0066';
-  ctx.fillText('♥ ' + lives, 20, 40);
+  ctx.fillText('\u2665 ' + lives, mob ? 8 : 20, mob ? 36 : 40);
 
-  // Score
-  ctx.fillStyle = '#ff00ff';
-  ctx.fillText('★ ' + score, 20, 65);
-
-  // Tech points
-  ctx.fillStyle = '#ffaa00';
-  ctx.fillText('⚡ ' + techPoints + ' TP', 20, 90);
+  if (!mob) {
+    // Score
+    ctx.fillStyle = '#ff00ff';
+    ctx.fillText('\u2605 ' + score, 20, 65);
+    // Tech points
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillText('\u26A1 ' + techPoints + ' TP', 20, 90);
+  } else {
+    // Mobile: score + TP on one line, smaller
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#ff00ff';
+    ctx.fillText('\u2605' + score, 8, 54);
+    ctx.fillStyle = '#ffaa00';
+    ctx.fillText('\u26A1' + techPoints, 8 + ctx.measureText('\u2605' + score).width + 10, 54);
+  }
 
   // Wave
+  ctx.font = 'bold ' + fSize + 'px "Segoe UI", monospace';
   ctx.textAlign = 'right';
   ctx.fillStyle = '#00ffff';
-  ctx.fillText('WAVE ' + wave, W - 20, 15);
+  ctx.fillText('WAVE ' + wave, W - (mob ? 8 : 20), mob ? 18 : 15);
 
   // Speed control button
-  const speedBtnW = 50, speedBtnH = 22;
-  const speedBtnX = W - 75, speedBtnY = 38;
+  const speedBtnW = mob ? 42 : 50, speedBtnH = mob ? 20 : 22;
+  const speedBtnX = W - (mob ? 50 : 75), speedBtnY = mob ? 38 : 38;
   ctx.fillStyle = gameSpeed > 1 ? 'rgba(255,200,0,0.15)' : 'rgba(0,255,255,0.08)';
   ctx.strokeStyle = gameSpeed > 1 ? '#ffcc0088' : '#00ffff44';
   ctx.lineWidth = 1;
   ctx.fillRect(speedBtnX, speedBtnY, speedBtnW, speedBtnH);
   ctx.strokeRect(speedBtnX, speedBtnY, speedBtnW, speedBtnH);
-  ctx.font = 'bold 13px monospace';
+  ctx.font = 'bold ' + (mob ? 11 : 13) + 'px monospace';
   ctx.fillStyle = gameSpeed > 1 ? '#ffcc00' : '#00ffff';
   ctx.textAlign = 'center';
   ctx.fillText('\u25B6'.repeat(gameSpeed) + ' ' + gameSpeed + 'x', speedBtnX + speedBtnW / 2, speedBtnY + speedBtnH / 2 + 1);
@@ -3232,14 +3263,14 @@ function drawHUD() {
   speedBtnBounds = { x: speedBtnX, y: speedBtnY, w: speedBtnW, h: speedBtnH };
 
   // Auto-wave toggle button
-  const awBtnW = 50, awBtnH = 22;
-  const awBtnX = W - 75, awBtnY = 64;
+  const awBtnW = mob ? 42 : 50, awBtnH = mob ? 20 : 22;
+  const awBtnX = W - (mob ? 50 : 75), awBtnY = mob ? 60 : 64;
   ctx.fillStyle = autoWave ? 'rgba(0,255,136,0.15)' : 'rgba(60,30,80,0.3)';
   ctx.strokeStyle = autoWave ? '#00ff8844' : '#44335544';
   ctx.lineWidth = 1;
   ctx.fillRect(awBtnX, awBtnY, awBtnW, awBtnH);
   ctx.strokeRect(awBtnX, awBtnY, awBtnW, awBtnH);
-  ctx.font = 'bold 11px monospace';
+  ctx.font = 'bold ' + (mob ? 9 : 11) + 'px monospace';
   ctx.fillStyle = autoWave ? '#00ff88' : '#555566';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
@@ -3248,17 +3279,27 @@ function drawHUD() {
   autoWaveBtnBounds = { x: awBtnX, y: awBtnY, w: awBtnW, h: awBtnH };
 
   // High score (small, top right)
-  ctx.textAlign = 'right';
-  ctx.font = '11px monospace';
-  ctx.fillStyle = '#666688';
-  ctx.fillText('HI: ' + highScore, W - 20, 90);
+  if (!mob) {
+    ctx.textAlign = 'right';
+    ctx.font = '11px monospace';
+    ctx.fillStyle = '#666688';
+    ctx.fillText('HI: ' + highScore, W - 20, 90);
+  }
 
   // ── ABILITY BUTTONS ──
   abilityBtnBounds = [];
-  const abStartX = 140;
-  const abY = 16;
-  const abW = 52, abH = 48;
-  const abGap = 6;
+  // On mobile: position at bottom-left above panel; on desktop: top HUD bar
+  const abW = mob ? 46 : 52, abH = mob ? 42 : 48;
+  const abGap = mob ? 4 : 6;
+  let abStartX, abY;
+  if (mob) {
+    // Mobile: ability buttons at bottom-left, just above panel
+    abStartX = 8;
+    abY = H - getMobilePanelH() - abH - 8;
+  } else {
+    abStartX = 140;
+    abY = 16;
+  }
   for (let i = 0; i < abilities.length; i++) {
     const ab = abilities[i];
     const ax = abStartX + i * (abW + abGap);
@@ -3266,10 +3307,10 @@ function drawHUD() {
     const cdRatio = ready ? 0 : ab.timer / ab.cooldown;
     abilityBtnBounds.push({ x: ax, y: abY, w: abW, h: abH });
     // Background
-    ctx.fillStyle = ready ? ab.color + '18' : 'rgba(10,5,20,0.7)';
-    ctx.strokeStyle = ready ? ab.color + '88' : '#22223344';
-    ctx.lineWidth = ready ? 1.5 : 1;
-    roundedRect(ax, abY, abW, abH, 4);
+    ctx.fillStyle = ready ? ab.color + '22' : 'rgba(10,5,20,0.75)';
+    ctx.strokeStyle = ready ? ab.color + 'aa' : '#22223344';
+    ctx.lineWidth = ready ? 2 : 1;
+    roundedRect(ax, abY, abW, abH, mob ? 8 : 4);
     ctx.fill();
     ctx.stroke();
     // Cooldown overlay
@@ -3277,24 +3318,26 @@ function drawHUD() {
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.fillRect(ax + 1, abY + 1, abW - 2, (abH - 2) * cdRatio);
     }
-    // Icon
-    ctx.font = '18px monospace';
+    // Icon — bigger on mobile for tap area
+    ctx.font = (mob ? '20' : '18') + 'px monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = ready ? ab.color : '#333344';
-    ctx.fillText(ab.icon, ax + abW / 2, abY + 16);
-    // Key hint
-    ctx.font = 'bold 9px monospace';
-    ctx.fillStyle = ready ? '#ccccee' : '#444455';
-    ctx.fillText('[' + ab.key + ']', ax + abW / 2, abY + 32);
+    ctx.fillText(ab.icon, ax + abW / 2, abY + (mob ? 14 : 16));
+    // Key hint — hide on mobile (no keyboard)
+    if (!mob) {
+      ctx.font = 'bold 9px monospace';
+      ctx.fillStyle = ready ? '#ccccee' : '#444455';
+      ctx.fillText('[' + ab.key + ']', ax + abW / 2, abY + 32);
+    }
     // Cooldown time or READY
-    ctx.font = '8px monospace';
+    ctx.font = (mob ? '9' : '8') + 'px monospace';
     if (ready) {
       ctx.fillStyle = ab.color;
-      ctx.fillText('READY', ax + abW / 2, abY + 42);
+      ctx.fillText('READY', ax + abW / 2, abY + (mob ? 32 : 42));
     } else {
       ctx.fillStyle = '#666677';
-      ctx.fillText(Math.ceil(ab.timer) + 's', ax + abW / 2, abY + 42);
+      ctx.fillText(Math.ceil(ab.timer) + 's', ax + abW / 2, abY + (mob ? 32 : 42));
     }
   }
   // Shield charges indicator
@@ -3303,7 +3346,9 @@ function drawHUD() {
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     ctx.fillStyle = '#44ff88';
-    ctx.fillText('\u{1F6E1} x' + shieldCharges, abStartX + 3 * (abW + abGap) + 4, abY + 12);
+    const shX = abStartX + 3 * (abW + abGap) + 4;
+    const shY = abY + (mob ? 8 : 12);
+    ctx.fillText('\u{1F6E1} x' + shieldCharges, shX, shY);
   }
 
   // ── COMBO DISPLAY ──
@@ -3388,7 +3433,7 @@ function drawHUD() {
   ctx.fillStyle = '#666688';
   ctx.globalAlpha = 0.7;
   if (isMobile) {
-    ctx.fillText('TAP — place/select  |  SWIPE ↕ — camera  |  ⚡ tech tree', W / 2, 4);
+    ctx.fillText('TAP place  |  2xTAP sell  |  SWIPE \u2195 camera', W / 2, 4);
   } else {
     ctx.fillText('1-8 towers  |  SPACE wave  |  TAB tech  |  Q/W/E abilities  |  A auto  |  RMB sell', W / 2, 4);
   }
@@ -3401,13 +3446,21 @@ function drawHUD() {
     const t = infoTower;
     const def = TOWER_DEFS[t.type];
     const camOffset = camYSmooth * H;
-    const infoW = 170, infoH = 130;
-    let infoX = t.x + cellSize * 1.2;
-    let infoY = t.y + camOffset - infoH / 2;
-    // Keep on screen
-    if (infoX + infoW > W - 10) infoX = t.x - cellSize - infoW;
-    if (infoY < 10) infoY = 10;
-    if (infoY + infoH > H - PANEL_H - 10) infoY = H - PANEL_H - 10 - infoH;
+    const mob = isMobile && W < 600;
+    const infoW = mob ? Math.min(W - 16, 240) : 170;
+    const infoH = mob ? 140 : 130;
+    let infoX, infoY;
+    if (mob) {
+      // Mobile: center horizontally at top of screen
+      infoX = (W - infoW) / 2;
+      infoY = 70;
+    } else {
+      infoX = t.x + cellSize * 1.2;
+      infoY = t.y + camOffset - infoH / 2;
+      if (infoX + infoW > W - 10) infoX = t.x - cellSize - infoW;
+      if (infoY < 10) infoY = 10;
+    }
+    if (infoY + infoH > H - getMobilePanelH() - 10) infoY = H - getMobilePanelH() - 10 - infoH;
 
     // Panel bg with rounded corners
     ctx.fillStyle = 'rgba(8,0,20,0.95)';
@@ -3455,7 +3508,7 @@ function drawHUD() {
     ctx.fillText('Rate: ' + t.rate.toFixed(2) + 's', infoX + 85, infoY + 48);
 
     // ---- UPGRADE BUTTON ----
-    const btnW2 = infoW - 20, btnH2 = 24;
+    const btnW2 = infoW - 20, btnH2 = mob ? 30 : 24;
     if (t.level < 3) {
       const ucost = Math.floor(def.cost * t.level * 0.7);
       const canUp = credits >= ucost;
@@ -3590,95 +3643,161 @@ function roundedRect(x, y, w, h, r) {
 
 function drawPanel() {
   const W = logicalW, H = logicalH;
-  const panelY = H - PANEL_H;
+  const mob = isMobile && W < 600;
+  const panelH = mob ? 130 : PANEL_H;
+  const panelY = H - panelH;
   // Panel background
-  ctx.fillStyle = 'rgba(5,0,15,0.92)';
-  ctx.fillRect(0, panelY, W, PANEL_H);
-  // Top border
-  ctx.strokeStyle = '#ff00ff44';
-  ctx.lineWidth = 1;
+  ctx.fillStyle = 'rgba(5,0,15,0.94)';
+  ctx.fillRect(0, panelY, W, panelH);
+  // Top border glow
+  const borderGrad = ctx.createLinearGradient(0, panelY, W, panelY);
+  borderGrad.addColorStop(0, '#ff00ff00');
+  borderGrad.addColorStop(0.3, '#ff00ff44');
+  borderGrad.addColorStop(0.5, '#ff00ff66');
+  borderGrad.addColorStop(0.7, '#ff00ff44');
+  borderGrad.addColorStop(1, '#ff00ff00');
+  ctx.strokeStyle = borderGrad;
+  ctx.lineWidth = 1.5;
   ctx.beginPath();
   ctx.moveTo(0, panelY);
   ctx.lineTo(W, panelY);
   ctx.stroke();
   // Tower slots — responsive sizing
   const types = Object.keys(TOWER_DEFS);
-  const gap = isMobile ? 4 : 8;
-  const maxSlotW = 110;
-  const availW = W - 20;
-  const slotW = Math.min(maxSlotW, Math.floor((availW - (types.length - 1) * gap) / types.length));
-  const compact = slotW < 80; // very small screen → icon-only mode
-  const slotH = compact ? 60 : 80;
-  const totalW = types.length * slotW + (types.length - 1) * gap;
-  const startX = (W - totalW) / 2;
-  const slotY = panelY + (compact ? 8 : 15);
 
-  towerSlots = [];
-  for (let i = 0; i < types.length; i++) {
-    const type = types[i];
-    const def = TOWER_DEFS[type];
-    const sx = startX + i * (slotW + gap);
-    const isSelected = selectedType === type;
-    const isLocked = def.locked;
-    const canAfford = !isLocked && credits >= def.cost;
+  if (mob) {
+    // ── MOBILE: 2-row grid of tower icons ──
+    const cols = Math.min(6, types.length);
+    const rows = Math.ceil(types.length / cols);
+    const gap = 3;
+    const slotW = Math.floor((W - 12 - (cols - 1) * gap) / cols);
+    const slotH = 52;
+    const totalGridH = rows * slotH + (rows - 1) * gap;
+    const startY = panelY + Math.floor((panelH - totalGridH) / 2);
+    towerSlots = [];
+    for (let i = 0; i < types.length; i++) {
+      const type = types[i];
+      const def = TOWER_DEFS[type];
+      const c = i % cols;
+      const r = Math.floor(i / cols);
+      const sx = 6 + c * (slotW + gap);
+      const sy = startY + r * (slotH + gap);
+      const isSelected = selectedType === type;
+      const isLocked = def.locked;
+      const canAfford = !isLocked && credits >= def.cost;
 
-    towerSlots.push({ x: sx, y: slotY, w: slotW, h: slotH, type });
+      towerSlots.push({ x: sx, y: sy, w: slotW, h: slotH, type });
 
-    // Slot background
-    if (isLocked) {
-      ctx.fillStyle = 'rgba(10,3,20,0.85)';
-      ctx.strokeStyle = '#222233';
-    } else {
-      ctx.fillStyle = isSelected ? def.color + '22' : 'rgba(20,5,40,0.8)';
-      ctx.strokeStyle = isSelected ? def.color : (canAfford ? def.color + '66' : '#333344');
-    }
-    ctx.lineWidth = isSelected ? 2 : 1;
-    ctx.fillRect(sx, slotY, slotW, slotH);
-    ctx.strokeRect(sx, slotY, slotW, slotH);
+      // Slot background
+      if (isLocked) {
+        ctx.fillStyle = 'rgba(10,3,20,0.85)';
+        ctx.strokeStyle = '#22223366';
+      } else {
+        ctx.fillStyle = isSelected ? def.color + '22' : 'rgba(15,5,30,0.85)';
+        ctx.strokeStyle = isSelected ? def.color : (canAfford ? def.color + '55' : '#33334466');
+      }
+      ctx.lineWidth = isSelected ? 2 : 1;
+      roundedRect(sx, sy, slotW, slotH, 6);
+      ctx.fill();
+      ctx.stroke();
 
-    // Tower icon
-    ctx.globalAlpha = isLocked ? 0.15 : (canAfford ? 1 : 0.35);
-    const iconSize = compact ? 10 : 14;
-    const iconX = compact ? sx + slotW / 2 : sx + 28;
-    const iconY = compact ? slotY + 20 : slotY + 30;
-    drawTowerShape(iconX, iconY, type, isLocked ? '#333344' : def.color, iconSize, gameTime, 1);
-    ctx.globalAlpha = 1;
+      // Tower icon — centered
+      ctx.globalAlpha = isLocked ? 0.15 : (canAfford ? 1 : 0.35);
+      const iconSize = 10;
+      drawTowerShape(sx + slotW / 2, sy + 16, type, isLocked ? '#333344' : def.color, iconSize, gameTime, 1);
+      ctx.globalAlpha = 1;
 
-    if (compact) {
-      // Compact mode — just name + cost centered
-      ctx.font = 'bold 9px monospace';
+      // Name (short)
+      ctx.font = 'bold 8px monospace';
       ctx.fillStyle = isLocked ? '#333344' : (canAfford ? def.color : '#555566');
       ctx.textAlign = 'center';
       ctx.textBaseline = 'top';
-      ctx.fillText(def.name, sx + slotW / 2, slotY + 38);
+      const shortName = def.name.length > 5 ? def.name.substring(0, 5) : def.name;
+      ctx.fillText(isLocked ? '\u{1F512}' : shortName, sx + slotW / 2, sy + 30);
+
+      // Cost
       ctx.font = '8px monospace';
-      ctx.fillStyle = isLocked ? '#333344' : (canAfford ? '#ffcc00' : '#553300');
-      ctx.fillText(isLocked ? '🔒' : def.cost + '¢', sx + slotW / 2, slotY + 49);
-      ctx.textAlign = 'left';
-    } else {
-      // Full mode — name, cost, desc, hotkey
-      ctx.font = 'bold 12px monospace';
-      ctx.fillStyle = isLocked ? '#333344' : (canAfford ? def.color : '#555566');
-      ctx.textAlign = 'left';
-      ctx.textBaseline = 'top';
-      ctx.fillText(isLocked ? '🔒 ' + def.name : def.name, sx + 52, slotY + 10);
+      ctx.fillStyle = isLocked ? '#222233' : (canAfford ? '#ffcc00' : '#553300');
+      ctx.fillText(isLocked ? '' : def.cost + '\u00A2', sx + slotW / 2, sy + 40);
+    }
+    ctx.textAlign = 'left';
+  } else {
+    // ── DESKTOP: single-row layout ──
+    const gap = 8;
+    const maxSlotW = 110;
+    const availW = W - 20;
+    const slotW = Math.min(maxSlotW, Math.floor((availW - (types.length - 1) * gap) / types.length));
+    const compact = slotW < 80;
+    const slotH = compact ? 60 : 80;
+    const totalW = types.length * slotW + (types.length - 1) * gap;
+    const startX = (W - totalW) / 2;
+    const slotY = panelY + (compact ? 8 : 15);
 
-      ctx.font = '11px monospace';
+    towerSlots = [];
+    for (let i = 0; i < types.length; i++) {
+      const type = types[i];
+      const def = TOWER_DEFS[type];
+      const sx = startX + i * (slotW + gap);
+      const isSelected = selectedType === type;
+      const isLocked = def.locked;
+      const canAfford = !isLocked && credits >= def.cost;
+
+      towerSlots.push({ x: sx, y: slotY, w: slotW, h: slotH, type });
+
+      // Slot background
       if (isLocked) {
-        ctx.fillStyle = '#333344';
-        ctx.fillText('LOCKED', sx + 52, slotY + 28);
+        ctx.fillStyle = 'rgba(10,3,20,0.85)';
+        ctx.strokeStyle = '#222233';
       } else {
-        ctx.fillStyle = canAfford ? '#ffcc00' : '#553300';
-        ctx.fillText(def.cost + '¢', sx + 52, slotY + 28);
+        ctx.fillStyle = isSelected ? def.color + '22' : 'rgba(20,5,40,0.8)';
+        ctx.strokeStyle = isSelected ? def.color : (canAfford ? def.color + '66' : '#333344');
       }
+      ctx.lineWidth = isSelected ? 2 : 1;
+      ctx.fillRect(sx, slotY, slotW, slotH);
+      ctx.strokeRect(sx, slotY, slotW, slotH);
 
-      ctx.font = '10px monospace';
-      ctx.fillStyle = isLocked ? '#222233' : (canAfford ? '#888899' : '#333344');
-      ctx.fillText(def.desc, sx + 52, slotY + 44);
+      // Tower icon
+      ctx.globalAlpha = isLocked ? 0.15 : (canAfford ? 1 : 0.35);
+      const iconSize = compact ? 10 : 14;
+      const iconX = compact ? sx + slotW / 2 : sx + 28;
+      const iconY = compact ? slotY + 20 : slotY + 30;
+      drawTowerShape(iconX, iconY, type, isLocked ? '#333344' : def.color, iconSize, gameTime, 1);
+      ctx.globalAlpha = 1;
 
-      ctx.font = '10px monospace';
-      ctx.fillStyle = isLocked ? '#222233' : '#666677';
-      ctx.fillText('[' + (i + 1) + ']', sx + 52, slotY + 60);
+      if (compact) {
+        ctx.font = 'bold 9px monospace';
+        ctx.fillStyle = isLocked ? '#333344' : (canAfford ? def.color : '#555566');
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.fillText(def.name, sx + slotW / 2, slotY + 38);
+        ctx.font = '8px monospace';
+        ctx.fillStyle = isLocked ? '#333344' : (canAfford ? '#ffcc00' : '#553300');
+        ctx.fillText(isLocked ? '\u{1F512}' : def.cost + '\u00A2', sx + slotW / 2, slotY + 49);
+        ctx.textAlign = 'left';
+      } else {
+        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = isLocked ? '#333344' : (canAfford ? def.color : '#555566');
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'top';
+        ctx.fillText(isLocked ? '\u{1F512} ' + def.name : def.name, sx + 52, slotY + 10);
+
+        ctx.font = '11px monospace';
+        if (isLocked) {
+          ctx.fillStyle = '#333344';
+          ctx.fillText('LOCKED', sx + 52, slotY + 28);
+        } else {
+          ctx.fillStyle = canAfford ? '#ffcc00' : '#553300';
+          ctx.fillText(def.cost + '\u00A2', sx + 52, slotY + 28);
+        }
+
+        ctx.font = '10px monospace';
+        ctx.fillStyle = isLocked ? '#222233' : (canAfford ? '#888899' : '#333344');
+        ctx.fillText(def.desc, sx + 52, slotY + 44);
+
+        ctx.font = '10px monospace';
+        ctx.fillStyle = isLocked ? '#222233' : '#666677';
+        ctx.fillText('[' + (i + 1) + ']', sx + 52, slotY + 60);
+      }
     }
   }
 }
@@ -3916,6 +4035,11 @@ function gameLoop(timestamp) {
     // Smooth camera
     camYSmooth += (camYTarget - camYSmooth) * Math.min(1, CAM_SPEED * dt);
     if (Math.abs(camYSmooth - camYTarget) < 0.002) camYSmooth = camYTarget;
+    // Tap feedback
+    if (tapFeedback && tapFeedback.timer > 0) {
+      tapFeedback.timer -= dt;
+      if (tapFeedback.timer <= 0) tapFeedback = null;
+    }
   }
   try {
   render();
@@ -3988,10 +4112,19 @@ let isMobile = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
 let touchStartY = 0;
 let touchStartX = 0;
 let touchMoved = false;
+let touchStartTime = 0;
+let lastTapTime = 0;
+let lastTapKey = '';
+let tapFeedback = null;  // { x, y, timer, color }
 
 function getTouchPos(e) {
   const t = e.changedTouches ? e.changedTouches[0] : e.touches[0];
   return { x: t.clientX, y: t.clientY };
+}
+
+// Visual tap ripple effect
+function spawnTapFeedback(x, y, color) {
+  tapFeedback = { x, y, timer: 0.35, maxTimer: 0.35, color: color || '#ffffff' };
 }
 
 canvas.addEventListener('touchstart', e => {
@@ -4002,6 +4135,7 @@ canvas.addEventListener('touchstart', e => {
   touchStartX = pos.x;
   touchStartY = pos.y;
   touchMoved = false;
+  touchStartTime = performance.now();
 
   // Update hovered cell for ground view
   if (camYSmooth < 0.3) {
@@ -4024,19 +4158,19 @@ canvas.addEventListener('touchmove', e => {
   mouseY = pos.y;
   const dy = pos.y - touchStartY;
   const dx = pos.x - touchStartX;
-  if (Math.abs(dy) > 15 || Math.abs(dx) > 15) touchMoved = true;
+  if (Math.abs(dy) > 12 || Math.abs(dx) > 12) touchMoved = true;
 
-  // Swipe up/down for camera
-  if (Math.abs(dy) > 50 && Math.abs(dy) > Math.abs(dx) * 1.5) {
-    if (dy < -50 && camYSmooth < 0.5) {
-      camYTarget = 1; // swipe up → tech tree
-    } else if (dy > 50 && camYSmooth > 0.5) {
-      camYTarget = 0; // swipe down → battlefield
+  // Swipe up/down for camera — lower threshold for easier activation
+  if (Math.abs(dy) > 40 && Math.abs(dy) > Math.abs(dx) * 1.3) {
+    if (dy < -40 && camYSmooth < 0.5) {
+      camYTarget = 1;
+    } else if (dy > 40 && camYSmooth > 0.5) {
+      camYTarget = 0;
     }
   }
 
-  // Update hovered cell while dragging on ground
-  if (camYSmooth < 0.3 && !touchMoved) {
+  // Update hovered cell for tower placement preview
+  if (camYSmooth < 0.3 && selectedType) {
     const cell = worldToCell(mouseX, mouseY);
     if (cell.col >= 0 && cell.col < COLS && cell.row >= 0 && cell.row < ROWS) {
       hoveredCell = cell;
@@ -4046,16 +4180,19 @@ canvas.addEventListener('touchmove', e => {
 
 canvas.addEventListener('touchend', e => {
   e.preventDefault();
-  if (touchMoved) return; // was a swipe, not a tap
+  if (touchMoved) return;
 
   const pos = getTouchPos(e);
   mouseX = pos.x;
   mouseY = pos.y;
+  const tapDuration = performance.now() - touchStartTime;
 
   if (gamePhase !== 'playing') return;
 
-  // Simulate click — reuse click logic
   const mx = pos.x, my = pos.y;
+
+  // Visual tap feedback
+  spawnTapFeedback(mx, my);
 
   // Check speed button
   if (speedBtnBounds) {
@@ -4063,6 +4200,7 @@ canvas.addEventListener('touchend', e => {
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       const idx = SPEED_OPTIONS.indexOf(gameSpeed);
       gameSpeed = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+      spawnTapFeedback(mx, my, '#ffcc00');
       return;
     }
   }
@@ -4072,6 +4210,7 @@ canvas.addEventListener('touchend', e => {
     const b = abilityBtnBounds[i];
     if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       activateAbility(i);
+      spawnTapFeedback(mx, my, abilities[i].color);
       return;
     }
   }
@@ -4081,6 +4220,7 @@ canvas.addEventListener('touchend', e => {
     const b = autoWaveBtnBounds;
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       autoWave = !autoWave;
+      spawnTapFeedback(mx, my, autoWave ? '#00ff88' : '#555566');
       return;
     }
   }
@@ -4090,6 +4230,7 @@ canvas.addEventListener('touchend', e => {
     const b = mobileCamBtn;
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       camYTarget = camYTarget > 0.5 ? 0 : 1;
+      spawnTapFeedback(mx, my, '#00ffff');
       return;
     }
   }
@@ -4099,6 +4240,7 @@ canvas.addEventListener('touchend', e => {
     const b = nextWaveBtn;
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       if (!waveActive) startWave();
+      spawnTapFeedback(mx, my, '#00ffff');
       return;
     }
   }
@@ -4117,6 +4259,7 @@ canvas.addEventListener('touchend', e => {
     const b = towerUpgradeBtn;
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       upgradeTower(b.key);
+      spawnTapFeedback(mx, my, '#00ff88');
       return;
     }
   }
@@ -4127,6 +4270,7 @@ canvas.addEventListener('touchend', e => {
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       sellTower(b.key);
       selectedTowerKey = null;
+      spawnTapFeedback(mx, my, '#ff4444');
       return;
     }
   }
@@ -4137,6 +4281,7 @@ canvas.addEventListener('touchend', e => {
       if (!TOWER_DEFS[slot.type].locked) {
         selectedType = selectedType === slot.type ? null : slot.type;
         selectedTowerKey = null;
+        spawnTapFeedback(mx, my, TOWER_DEFS[slot.type].color);
       }
       return;
     }
@@ -4147,9 +4292,21 @@ canvas.addEventListener('touchend', e => {
     const cell = worldToCell(mx, my);
     if (cell && cell.col >= 0 && cell.col < COLS && cell.row >= 0 && cell.row < ROWS) {
       const key = cell.col + ',' + cell.row;
-      // Tap on a tower -> select it
+      // Double-tap on tower → quick sell
       if (towers.has(key) && !selectedType) {
+        const now = performance.now();
+        if (lastTapKey === key && now - lastTapTime < 400) {
+          // Double-tap → sell
+          sellTower(key);
+          selectedTowerKey = null;
+          lastTapKey = '';
+          spawnTapFeedback(mx, my, '#ff4444');
+          return;
+        }
+        lastTapKey = key;
+        lastTapTime = now;
         selectedTowerKey = selectedTowerKey === key ? null : key;
+        spawnTapFeedback(mx, my, towers.get(key).color);
         return;
       }
       // Place tower
@@ -4158,6 +4315,7 @@ canvas.addEventListener('touchend', e => {
         placeTower(cell.col, cell.row, selectedType);
         return;
       }
+      lastTapKey = '';
     }
   }
 
@@ -4169,6 +4327,7 @@ canvas.addEventListener('touchend', e => {
     for (const btn of techTreeBtns) {
       if (mx >= btn.x && mx <= btn.x + btn.w && localMouseY >= btn.y && localMouseY <= btn.y + btn.h) {
         unlockTech(btn.tech);
+        spawnTapFeedback(mx, my, btn.tech.color);
         return;
       }
     }
