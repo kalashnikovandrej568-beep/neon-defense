@@ -211,51 +211,158 @@ let WAYPOINTS = [
 ];
 
 // Generate random serpentine path each game
+// Path walks organically through the grid — can go any direction including back
+// Path length is normalised so difficulty doesn't depend on layout
+const TARGET_PATH_LENGTH = 45; // target number of cells for balanced difficulty (±5)
+
 function generateRandomWaypoints() {
-  const wp = [];
-  const margin = 1; // stay away from grid edges
-  // Entry point: left side, random row
-  const entryRow = Math.floor(Math.random() * (ROWS - 2 * margin)) + margin;
-  wp.push([-1, entryRow]);
-  wp.push([Math.floor(Math.random() * 2) + 1, entryRow]);
+  // We'll build waypoints by walking through the grid in random directions
+  // using a cell-visited grid to avoid crossing itself
+  const visited = Array.from({length: COLS}, () => Array(ROWS).fill(false));
+  const margin = 1;
 
-  // Generate 4-6 zigzag segments across the grid
-  const segments = 4 + Math.floor(Math.random() * 3); // 4-6
-  const colStep = Math.floor((COLS - 2) / segments);
-  let curX = wp[wp.length - 1][0];
-  let curY = wp[wp.length - 1][1];
-  let goingDown = Math.random() > 0.5;
+  // Random entry row
+  const entryRow = randInt(margin, ROWS - margin - 1);
+  const startX = randInt(1, 2);
 
-  for (let s = 0; s < segments; s++) {
-    // Vertical move
-    let targetY;
-    if (goingDown) {
-      targetY = ROWS - margin - 1 - Math.floor(Math.random() * 3);
-    } else {
-      targetY = margin + Math.floor(Math.random() * 3);
+  // BFS-like random walk to build a path through the grid
+  let bestPath = null;
+
+  for (let attempt = 0; attempt < 40; attempt++) {
+    const path = randomWalk(startX, entryRow, margin);
+    if (!path) continue;
+    // Prefer paths close to target length
+    if (!bestPath || Math.abs(path.length - TARGET_PATH_LENGTH) < Math.abs(bestPath.length - TARGET_PATH_LENGTH)) {
+      bestPath = path;
     }
-    // Clamp
-    targetY = Math.max(margin, Math.min(ROWS - margin - 1, targetY));
-    if (targetY !== curY) {
-      wp.push([curX, targetY]);
-      curY = targetY;
-    }
-    // Horizontal move
-    let nextX = curX + colStep + Math.floor(Math.random() * 3) - 1;
-    nextX = Math.max(curX + 2, Math.min(COLS - 1, nextX));
-    if (s === segments - 1) nextX = Math.min(nextX, COLS - 1);
-    wp.push([nextX, curY]);
-    curX = nextX;
-    goingDown = !goingDown;
+    if (Math.abs(bestPath.length - TARGET_PATH_LENGTH) <= 5) break;
   }
 
-  // Exit point: right side
-  const exitRow = curY;
-  if (curX < COLS) {
-    wp.push([COLS, exitRow]);
+  if (!bestPath || bestPath.length < 15) {
+    // Fallback to default
+    WAYPOINTS = [[-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]];
+    return;
   }
+
+  // Convert cell path to waypoints (only keep direction changes)
+  const wp = [[-1, entryRow]];
+  wp.push([bestPath[0][0], bestPath[0][1]]);
+  for (let i = 1; i < bestPath.length - 1; i++) {
+    const [px, py] = bestPath[i - 1];
+    const [cx, cy] = bestPath[i];
+    const [nx, ny] = bestPath[i + 1];
+    const dx1 = cx - px, dy1 = cy - py;
+    const dx2 = nx - cx, dy2 = ny - cy;
+    if (dx1 !== dx2 || dy1 !== dy2) {
+      wp.push([cx, cy]);
+    }
+  }
+  const last = bestPath[bestPath.length - 1];
+  wp.push([last[0], last[1]]);
+  wp.push([COLS, last[1]]); // exit right
 
   WAYPOINTS = wp;
+}
+
+function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
+
+function randomWalk(startX, startY, margin) {
+  const visited = Array.from({length: COLS}, () => Array(ROWS).fill(false));
+  const path = [[startX, startY]];
+  visited[startX][startY] = true;
+
+  let x = startX, y = startY;
+  // Bias: generally move right but allow other directions
+  // Directions: right, down, up, left
+  const dirs = [[1,0],[0,1],[0,-1],[-1,0]];
+
+  let stuckCount = 0;
+  const maxSteps = 80;
+  const minExitX = COLS - 4; // must reach at least this X to exit
+
+  for (let step = 0; step < maxSteps; step++) {
+    // Shuffle directions with weighted randomness
+    const candidates = [];
+    for (const [dx, dy] of dirs) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < margin || nx >= COLS - margin || ny < margin || ny >= ROWS - margin) continue;
+      if (visited[nx][ny]) continue;
+      // Check that we don't box ourselves in (require >=1 further exit from new cell)
+      let exits = 0;
+      for (const [ddx, ddy] of dirs) {
+        const nnx = nx + ddx, nny = ny + ddy;
+        if (nnx >= 0 && nnx < COLS && nny >= 0 && nny < ROWS && !visited[nnx][nny]) exits++;
+      }
+      if (exits === 0 && path.length < TARGET_PATH_LENGTH - 5) continue; // don't dead-end too early
+
+      // Weight: right gets higher bias, left lower, up/down medium
+      let weight;
+      if (dx === 1)       weight = 4;   // right — main direction
+      else if (dx === -1) weight = 1.5; // left — backtrack sometimes
+      else                weight = 2.5; // up/down — turns
+
+      // If we're far right already, increase left/vertical bias for more twists
+      if (x > COLS * 0.6) {
+        if (dx === -1) weight = 3;
+        if (dx === 0)  weight = 3.5;
+        if (dx === 1)  weight = 2;
+      }
+
+      // If path is getting long enough and we're far right, bias toward exit
+      if (path.length > TARGET_PATH_LENGTH - 10 && x >= minExitX) {
+        if (dx === 1) weight = 8;
+      }
+
+      candidates.push({ dx, dy, nx, ny, weight });
+    }
+
+    if (candidates.length === 0) {
+      stuckCount++;
+      if (stuckCount > 3) break;
+      // Try to backtrack
+      if (path.length > 5) {
+        path.pop();
+        const prev = path[path.length - 1];
+        x = prev[0]; y = prev[1];
+      }
+      continue;
+    }
+    stuckCount = 0;
+
+    // Weighted random pick
+    const totalW = candidates.reduce((s, c) => s + c.weight, 0);
+    let roll = Math.random() * totalW;
+    let chosen = candidates[0];
+    for (const c of candidates) {
+      roll -= c.weight;
+      if (roll <= 0) { chosen = c; break; }
+    }
+
+    x = chosen.nx;
+    y = chosen.ny;
+    visited[x][y] = true;
+    path.push([x, y]);
+
+    // Check exit condition: reached far right and we have enough length
+    if (x >= COLS - margin - 1 && path.length >= TARGET_PATH_LENGTH - 8) {
+      break;
+    }
+  }
+
+  // Only accept paths that reach far enough right
+  if (x < minExitX) return null;
+  if (path.length < 15) return null;
+
+  // Walk straight right to edge if not there
+  while (x < COLS - margin) {
+    x++;
+    if (x < COLS && !visited[x][y]) {
+      visited[x][y] = true;
+      path.push([x, y]);
+    }
+  }
+
+  return path;
 }
 
 const TOWER_DEFS = {
