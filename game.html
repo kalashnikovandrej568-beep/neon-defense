@@ -70,6 +70,8 @@ input[type=range].neon-slider::-moz-range-thumb{width:18px;height:18px;border-ra
 #gameOverScreen .new-record{color:#ffcc00;animation:blink 0.5s ease-in-out infinite;font-size:20px;margin-bottom:5px}
 #gameOverScreen .start-btn{font-size:20px;color:#00ffff;text-shadow:0 0 15px #00ffff;cursor:pointer;background:none;border:2px solid #00ffff66;padding:12px 40px;font-family:inherit;letter-spacing:4px;transition:all .3s}
 #gameOverScreen .start-btn:hover{border-color:#00ffff;background:#00ffff11;box-shadow:0 0 30px #00ffff44}
+#gameOverScreen .menu-back-btn{color:#ff44aa;border-color:#ff44aa44;font-size:16px;padding:8px 30px;margin-top:8px;animation:none;letter-spacing:3px}
+#gameOverScreen .menu-back-btn:hover{border-color:#ff44aa;background:#ff44aa11;box-shadow:0 0 20px #ff44aa44;text-shadow:0 0 15px #ff44aa}
 </style>
 </head>
 <body>
@@ -184,7 +186,8 @@ input[type=range].neon-slider::-moz-range-thumb{width:18px;height:18px;border-ra
     <div class="stat-item"><div class="stat-value" id="statCombo">0</div><div class="stat-label">Max Combo</div></div>
     <div class="stat-item"><div class="stat-value" id="statTowers">0</div><div class="stat-label">Towers Built</div></div>
   </div>
-  <button class="start-btn" id="restartBtn">▶ PLAY AGAIN ◀</button>
+  <button class="start-btn" id="restartBtn">▶ ИГРАТЬ СНОВА ◀</button>
+  <button class="start-btn menu-back-btn" id="backToMenuBtn">◀ В МЕНЮ</button>
 </div>
 
 <script>
@@ -203,9 +206,57 @@ function getMobilePanelH() {
 }
 const BPM = 100;
 
-const WAYPOINTS = [
+let WAYPOINTS = [
   [-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]
 ];
+
+// Generate random serpentine path each game
+function generateRandomWaypoints() {
+  const wp = [];
+  const margin = 1; // stay away from grid edges
+  // Entry point: left side, random row
+  const entryRow = Math.floor(Math.random() * (ROWS - 2 * margin)) + margin;
+  wp.push([-1, entryRow]);
+  wp.push([Math.floor(Math.random() * 2) + 1, entryRow]);
+
+  // Generate 4-6 zigzag segments across the grid
+  const segments = 4 + Math.floor(Math.random() * 3); // 4-6
+  const colStep = Math.floor((COLS - 2) / segments);
+  let curX = wp[wp.length - 1][0];
+  let curY = wp[wp.length - 1][1];
+  let goingDown = Math.random() > 0.5;
+
+  for (let s = 0; s < segments; s++) {
+    // Vertical move
+    let targetY;
+    if (goingDown) {
+      targetY = ROWS - margin - 1 - Math.floor(Math.random() * 3);
+    } else {
+      targetY = margin + Math.floor(Math.random() * 3);
+    }
+    // Clamp
+    targetY = Math.max(margin, Math.min(ROWS - margin - 1, targetY));
+    if (targetY !== curY) {
+      wp.push([curX, targetY]);
+      curY = targetY;
+    }
+    // Horizontal move
+    let nextX = curX + colStep + Math.floor(Math.random() * 3) - 1;
+    nextX = Math.max(curX + 2, Math.min(COLS - 1, nextX));
+    if (s === segments - 1) nextX = Math.min(nextX, COLS - 1);
+    wp.push([nextX, curY]);
+    curX = nextX;
+    goingDown = !goingDown;
+  }
+
+  // Exit point: right side
+  const exitRow = curY;
+  if (curX < COLS) {
+    wp.push([COLS, exitRow]);
+  }
+
+  WAYPOINTS = wp;
+}
 
 const TOWER_DEFS = {
   laser:   { name:'LASER',   cost:50,  range:3,   dmg:15,  rate:0.4,  color:'#00ffff', desc:'Fast beam',   locked:false },
@@ -311,6 +362,7 @@ let screenShake = { x:0, y:0, intensity:0 };
 let gameSpeed = 1; // 1x, 2x, 3x
 const SPEED_OPTIONS = [1, 2, 3];
 let speedBtnBounds = null;
+let menuBtnBounds = null;
 
 // ─── SETTINGS ────────────────────────────────────
 let settingMusicVol = 0.70;  // 0..1
@@ -3450,6 +3502,24 @@ function drawHUD() {
     ctx.fillText('HI: ' + highScore, W - 20, 90);
   }
 
+  // ── MENU BUTTON (☰) ──
+  const menuBtnS = mob ? 28 : 30;
+  const menuBtnX = mob ? W - 55 : W - 130;
+  const menuBtnY = mob ? 82 : 90;
+  ctx.fillStyle = 'rgba(60,30,80,0.4)';
+  ctx.strokeStyle = '#ff44aa44';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.roundRect(menuBtnX, menuBtnY, menuBtnS, menuBtnS, 5);
+  ctx.fill(); ctx.stroke();
+  ctx.font = 'bold ' + (mob ? 14 : 16) + 'px monospace';
+  ctx.fillStyle = '#ff44aa';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('\u2630', menuBtnX + menuBtnS / 2, menuBtnY + menuBtnS / 2);
+  ctx.textBaseline = 'top';
+  menuBtnBounds = { x: menuBtnX, y: menuBtnY, w: menuBtnS, h: menuBtnS };
+
   // ── ABILITY BUTTONS ──
   abilityBtnBounds = [];
   // On mobile: position at bottom-left above panel; on desktop: top HUD bar
@@ -4036,6 +4106,16 @@ canvas.addEventListener('click', e => {
     }
   }
 
+  // Check menu button (☰) — return to start screen
+  if (menuBtnBounds) {
+    const b = menuBtnBounds;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      document.getElementById('startScreen').style.display = 'flex';
+      gamePhase = 'menu';
+      return;
+    }
+  }
+
   // Check mobile camera toggle button
   if (mobileCamBtn) {
     const b = mobileCamBtn;
@@ -4254,6 +4334,9 @@ function initGame() {
   for (const key of Object.keys(TOWER_DEFS)) {
     TOWER_DEFS[key].locked = ['flame','sniper','pulse','void','mortar','poison','railgun'].includes(key);
   }
+  // Generate new random path each game
+  generateRandomWaypoints();
+  generatePath();
 }
 
 // ─── EVENT LISTENERS ─────────────────────────────
@@ -4360,6 +4443,12 @@ document.getElementById('restartBtn').addEventListener('click', () => {
   initGame();
   gamePhase = 'playing';
   waveBanner = { text: 'РАССТАВЬ БАШНИ И ЗАПУСТИ ВОЛНУ!', alpha: 1, timer: 3 };
+});
+
+document.getElementById('backToMenuBtn').addEventListener('click', () => {
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('startScreen').style.display = 'flex';
+  gamePhase = 'menu';
 });
 
 // ─── TOUCH / MOBILE SUPPORT ──────────────────────
@@ -4476,6 +4565,17 @@ canvas.addEventListener('touchend', e => {
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       autoWave = !autoWave;
       spawnTapFeedback(mx, my, autoWave ? '#00ff88' : '#555566');
+      return;
+    }
+  }
+
+  // Check menu button (☰) — return to start screen
+  if (menuBtnBounds) {
+    const b = menuBtnBounds;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      document.getElementById('startScreen').style.display = 'flex';
+      gamePhase = 'menu';
+      spawnTapFeedback(mx, my, '#ff44aa');
       return;
     }
   }
