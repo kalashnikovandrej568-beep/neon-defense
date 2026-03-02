@@ -210,159 +210,221 @@ let WAYPOINTS = [
   [-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]
 ];
 
-// Generate random serpentine path each game
-// Path walks organically through the grid — can go any direction including back
-// Path length is normalised so difficulty doesn't depend on layout
-const TARGET_PATH_LENGTH = 45; // target number of cells for balanced difficulty (±5)
-
-function generateRandomWaypoints() {
-  // We'll build waypoints by walking through the grid in random directions
-  // using a cell-visited grid to avoid crossing itself
-  const visited = Array.from({length: COLS}, () => Array(ROWS).fill(false));
-  const margin = 1;
-
-  // Random entry row
-  const entryRow = randInt(margin, ROWS - margin - 1);
-  const startX = randInt(1, 2);
-
-  // BFS-like random walk to build a path through the grid
-  let bestPath = null;
-
-  for (let attempt = 0; attempt < 40; attempt++) {
-    const path = randomWalk(startX, entryRow, margin);
-    if (!path) continue;
-    // Prefer paths close to target length
-    if (!bestPath || Math.abs(path.length - TARGET_PATH_LENGTH) < Math.abs(bestPath.length - TARGET_PATH_LENGTH)) {
-      bestPath = path;
-    }
-    if (Math.abs(bestPath.length - TARGET_PATH_LENGTH) <= 5) break;
-  }
-
-  if (!bestPath || bestPath.length < 15) {
-    // Fallback to default
-    WAYPOINTS = [[-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]];
-    return;
-  }
-
-  // Convert cell path to waypoints (only keep direction changes)
-  const wp = [[-1, entryRow]];
-  wp.push([bestPath[0][0], bestPath[0][1]]);
-  for (let i = 1; i < bestPath.length - 1; i++) {
-    const [px, py] = bestPath[i - 1];
-    const [cx, cy] = bestPath[i];
-    const [nx, ny] = bestPath[i + 1];
-    const dx1 = cx - px, dy1 = cy - py;
-    const dx2 = nx - cx, dy2 = ny - cy;
-    if (dx1 !== dx2 || dy1 !== dy2) {
-      wp.push([cx, cy]);
-    }
-  }
-  const last = bestPath[bestPath.length - 1];
-  wp.push([last[0], last[1]]);
-  wp.push([COLS, last[1]]); // exit right
-
-  WAYPOINTS = wp;
-}
+// Generate random path each game
+// Pattern: segments of [vertical move] then [horizontal move]
+// Goes LEFT and RIGHT, but after left always follows right (and vice-ok)
+// After up-left → up-right, after down-left → down-right
+// Paths never cross themselves, length ~TARGET for balanced difficulty
+const TARGET_PATH_LENGTH = 45;
 
 function randInt(a, b) { return a + Math.floor(Math.random() * (b - a + 1)); }
 
-function randomWalk(startX, startY, margin) {
-  const visited = Array.from({length: COLS}, () => Array(ROWS).fill(false));
-  const path = [[startX, startY]];
-  visited[startX][startY] = true;
+function generateRandomWaypoints() {
+  let best = null;
+  for (let attempt = 0; attempt < 60; attempt++) {
+    const result = tryGeneratePath();
+    if (!result) continue;
+    const len = calcPathLen(result);
+    if (!best || Math.abs(len - TARGET_PATH_LENGTH) < Math.abs(calcPathLen(best) - TARGET_PATH_LENGTH)) {
+      best = result;
+    }
+    if (Math.abs(calcPathLen(best) - TARGET_PATH_LENGTH) <= 4) break;
+  }
+  if (!best) {
+    WAYPOINTS = [[-1,6],[2,6],[2,2],[6,2],[6,9],[10,9],[10,3],[14,3],[14,10],[18,10],[18,6],[20,6]];
+    return;
+  }
+  WAYPOINTS = best;
+}
 
-  let x = startX, y = startY;
-  // Bias: generally move right but allow other directions
-  // Directions: right, down, up, left
-  const dirs = [[1,0],[0,1],[0,-1],[-1,0]];
+function calcPathLen(wp) {
+  let len = 0;
+  for (let i = 1; i < wp.length; i++) {
+    len += Math.abs(wp[i][0] - wp[i-1][0]) + Math.abs(wp[i][1] - wp[i-1][1]);
+  }
+  return len;
+}
 
-  let stuckCount = 0;
-  const maxSteps = 80;
-  const minExitX = COLS - 4; // must reach at least this X to exit
+function tryGeneratePath() {
+  const margin = 1;
+  const maxY = ROWS - margin - 1;
+  const minY = margin;
+  const maxX = COLS - margin - 1;
+  const minX = margin;
 
-  for (let step = 0; step < maxSteps; step++) {
-    // Shuffle directions with weighted randomness
-    const candidates = [];
-    for (const [dx, dy] of dirs) {
-      const nx = x + dx, ny = y + dy;
-      if (nx < margin || nx >= COLS - margin || ny < margin || ny >= ROWS - margin) continue;
-      if (visited[nx][ny]) continue;
-      // Check that we don't box ourselves in (require >=1 further exit from new cell)
-      let exits = 0;
-      for (const [ddx, ddy] of dirs) {
-        const nnx = nx + ddx, nny = ny + ddy;
-        if (nnx >= 0 && nnx < COLS && nny >= 0 && nny < ROWS && !visited[nnx][nny]) exits++;
+  // Occupied columns tracking — store ranges per column to prevent crossing
+  // We track all cells the path uses
+  const usedCells = new Set();
+
+  function cellKey(x, y) { return x + ',' + y; }
+  function isUsed(x, y) { return usedCells.has(cellKey(x, y)); }
+
+  // Mark a straight segment and check for crossing
+  function canMarkSegment(x1, y1, x2, y2) {
+    const cells = [];
+    if (x1 === x2) {
+      // Vertical
+      const step = y2 > y1 ? 1 : -1;
+      for (let y = y1; y !== y2 + step; y += step) {
+        if (y === y1 && cells.length === 0) { /* start cell — already marked */ }
+        if (isUsed(x1, y) && !(x1 === x1 && y === y1)) return null; // crosses except start
+        cells.push([x1, y]);
       }
-      if (exits === 0 && path.length < TARGET_PATH_LENGTH - 5) continue; // don't dead-end too early
-
-      // Weight: right gets higher bias, left lower, up/down medium
-      let weight;
-      if (dx === 1)       weight = 4;   // right — main direction
-      else if (dx === -1) weight = 1.5; // left — backtrack sometimes
-      else                weight = 2.5; // up/down — turns
-
-      // If we're far right already, increase left/vertical bias for more twists
-      if (x > COLS * 0.6) {
-        if (dx === -1) weight = 3;
-        if (dx === 0)  weight = 3.5;
-        if (dx === 1)  weight = 2;
+    } else {
+      // Horizontal
+      const step = x2 > x1 ? 1 : -1;
+      for (let x = x1; x !== x2 + step; x += step) {
+        if (isUsed(x, y1) && !(x === x1 && y1 === y1)) return null;
+        cells.push([x, y1]);
       }
+    }
+    return cells;
+  }
 
-      // If path is getting long enough and we're far right, bias toward exit
-      if (path.length > TARGET_PATH_LENGTH - 10 && x >= minExitX) {
-        if (dx === 1) weight = 8;
-      }
+  function markCells(cells) {
+    for (const [cx, cy] of cells) usedCells.add(cellKey(cx, cy));
+  }
 
-      candidates.push({ dx, dy, nx, ny, weight });
+  // Entry
+  const entryY = randInt(minY + 1, maxY - 1);
+  const startX = randInt(1, 2);
+  const wp = [[-1, entryY], [startX, entryY]];
+
+  // Mark entry segment
+  for (let x = 0; x <= startX; x++) usedCells.add(cellKey(x, entryY));
+
+  let curX = startX;
+  let curY = entryY;
+
+  // We'll build paired segments:
+  // Pair = [vertical move] + [horizontal move]
+  // If horizontal goes LEFT, next pair's horizontal MUST go RIGHT
+  // Vertical direction follows rule: up-left → up-right, down-left → down-right
+  const numPairs = randInt(4, 7);
+  let lastHDir = 1; // start as if we came from the left (last horizontal was right)
+  let lastVDir = 0; // no vertical preference yet
+
+  for (let p = 0; p < numPairs; p++) {
+    const isLast = (p === numPairs - 1);
+
+    // ── VERTICAL MOVE ──
+    // Pick vertical direction
+    let vDir;
+    if (lastHDir === -1) {
+      // After going left: keep same vertical direction
+      // up-left → up-right, down-left → down-right
+      vDir = lastVDir || (Math.random() > 0.5 ? 1 : -1);
+    } else {
+      // After going right: free to pick any vertical direction
+      vDir = Math.random() > 0.5 ? 1 : -1;
     }
 
-    if (candidates.length === 0) {
-      stuckCount++;
-      if (stuckCount > 3) break;
-      // Try to backtrack
-      if (path.length > 5) {
-        path.pop();
-        const prev = path[path.length - 1];
-        x = prev[0]; y = prev[1];
+    // Vertical distance: 2-6 cells
+    let vLen = randInt(2, 6);
+    let targetY = curY + vDir * vLen;
+    targetY = Math.max(minY, Math.min(maxY, targetY));
+    if (targetY === curY) {
+      // Flip direction if can't move
+      targetY = curY - vDir * vLen;
+      targetY = Math.max(minY, Math.min(maxY, targetY));
+      vDir = -vDir;
+    }
+    if (targetY === curY) continue; // stuck, skip
+
+    // Check vertical segment for crossing
+    const vCells = canMarkSegment(curX, curY, curX, targetY);
+    if (!vCells) continue; // would cross, skip this pair
+    markCells(vCells);
+    curY = targetY;
+    wp.push([curX, curY]);
+    lastVDir = vDir;
+
+    // ── HORIZONTAL MOVE ──
+    let hDir;
+    if (lastHDir === -1) {
+      // After left, MUST go right
+      hDir = 1;
+    } else {
+      // After right, can go left (40% chance) or right (60%)
+      // But not on the last pair (must exit right)
+      if (isLast || curX < 4) {
+        hDir = 1; // too far left or last — go right
+      } else {
+        hDir = Math.random() < 0.4 ? -1 : 1;
       }
-      continue;
-    }
-    stuckCount = 0;
-
-    // Weighted random pick
-    const totalW = candidates.reduce((s, c) => s + c.weight, 0);
-    let roll = Math.random() * totalW;
-    let chosen = candidates[0];
-    for (const c of candidates) {
-      roll -= c.weight;
-      if (roll <= 0) { chosen = c; break; }
     }
 
-    x = chosen.nx;
-    y = chosen.ny;
-    visited[x][y] = true;
-    path.push([x, y]);
+    // Horizontal distance
+    let hLen;
+    if (hDir === -1) {
+      // Going left: shorter (2-4), don't go past column 2
+      hLen = randInt(2, 4);
+      const limit = curX - minX;
+      hLen = Math.min(hLen, limit);
+      if (hLen < 2) { hDir = 1; hLen = randInt(2, 5); } // can't go left, go right instead
+    }
+    if (hDir === 1) {
+      hLen = randInt(2, 5);
+      if (isLast) {
+        // On last pair, reach the right edge
+        hLen = maxX - curX;
+        if (hLen < 1) hLen = 1;
+      }
+    }
 
-    // Check exit condition: reached far right and we have enough length
-    if (x >= COLS - margin - 1 && path.length >= TARGET_PATH_LENGTH - 8) {
-      break;
+    let targetX = curX + hDir * hLen;
+    targetX = Math.max(minX, Math.min(maxX, targetX));
+    if (targetX === curX) continue;
+
+    // Check horizontal segment for crossing
+    const hCells = canMarkSegment(curX, curY, targetX, curY);
+    if (!hCells) {
+      // Try shorter
+      let shortened = false;
+      for (let tryLen = Math.abs(targetX - curX) - 1; tryLen >= 2; tryLen--) {
+        const tryX = curX + hDir * tryLen;
+        const tryCells = canMarkSegment(curX, curY, tryX, curY);
+        if (tryCells) {
+          markCells(tryCells);
+          curX = tryX;
+          wp.push([curX, curY]);
+          shortened = true;
+          break;
+        }
+      }
+      if (!shortened) continue; // skip this pair
+    } else {
+      markCells(hCells);
+      curX = targetX;
+      wp.push([curX, curY]);
+    }
+
+    lastHDir = hDir;
+
+    // If we reached far right, we're done
+    if (curX >= maxX - 1) break;
+  }
+
+  // Must reach far enough right
+  if (curX < COLS - 5) return null;
+
+  // Walk to right edge
+  if (curX < maxX) {
+    const exitCells = canMarkSegment(curX, curY, maxX, curY);
+    if (exitCells) {
+      markCells(exitCells);
+      curX = maxX;
+      wp.push([curX, curY]);
     }
   }
 
-  // Only accept paths that reach far enough right
-  if (x < minExitX) return null;
-  if (path.length < 15) return null;
+  // Exit off-screen
+  wp.push([COLS, curY]);
 
-  // Walk straight right to edge if not there
-  while (x < COLS - margin) {
-    x++;
-    if (x < COLS && !visited[x][y]) {
-      visited[x][y] = true;
-      path.push([x, y]);
-    }
-  }
+  // Validate: at least 6 waypoints for interesting path
+  if (wp.length < 6) return null;
 
-  return path;
+  return wp;
 }
 
 const TOWER_DEFS = {
