@@ -95,6 +95,7 @@ const ENEMY_DEFS = {
   drone:   { hp:40,   speed:2.2, reward:10, color:'#00ffcc', size:0.28, shape:'diamond' },
   walker:  { hp:100,  speed:1.2, reward:20, color:'#ff8800', size:0.35, shape:'square' },
   phantom: { hp:60,   speed:2.8, reward:30, color:'#8844ff', size:0.3,  shape:'triangle', stealth:true },
+  splitter:{ hp:160,  speed:1.5, reward:35, color:'#44ffaa', size:0.35, shape:'hexagon' },
   heavy:   { hp:300,  speed:0.6, reward:50, color:'#ff2244', size:0.45, shape:'pentagon' },
   boss:    { hp:1200, speed:0.35,reward:200,color:'#ffcc00', size:0.6,  shape:'octagon' }
 };
@@ -189,6 +190,15 @@ let autoWave = false;
 let autoWaveTimer = 0;
 const AUTO_WAVE_DELAY = 3; // seconds after wave clear
 let autoWaveBtnBounds = null;
+
+// ─── PLAYER ABILITIES ────────────────────────────
+let abilities = [
+  { id:'emp',       name:'EMP',    key:'Q', cooldown:40, timer:0, color:'#00ccff', icon:'\u26A1', desc:'Stun all 2s' },
+  { id:'airstrike', name:'STRIKE', key:'W', cooldown:55, timer:0, color:'#ff4400', icon:'\u{1F4A5}', desc:'Damage all' },
+  { id:'shield',    name:'SHIELD', key:'E', cooldown:80, timer:0, color:'#44ff88', icon:'\u{1F6E1}', desc:'Block 3 leaks', charges:0 }
+];
+let abilityBtnBounds = [];
+let shieldCharges = 0;
 
 // Camera system
 let camY = 0;        // 0 = game view (ground), 1 = sky view (tech tree)
@@ -959,7 +969,10 @@ function createEnemy(type, hpMult) {
     trailTimer: 0,
     stealth: def.stealth || false,
     burnTimer: 0,
-    burnDmg: 0
+    burnDmg: 0,
+    isMini: false,
+    spawnedMinions: false,
+    stunTimer: 0
   };
 }
 
@@ -1013,6 +1026,24 @@ function dealDamage(enemy, dmg, towerType) {
       const d = Math.hypot(t.x - enemy.x, t.y - enemy.y);
       if (d <= t.range + cellSize) { t.kills++; break; }
     }
+    // Splitter: spawn 2 mini enemies
+    if (enemy.type === 'splitter' && !enemy.isMini) {
+      for (let i = 0; i < 2; i++) {
+        const mini = createEnemy('splitter', 1);
+        mini.hp = Math.floor(enemy.maxHp * 0.3);
+        mini.maxHp = mini.hp;
+        mini.size = enemy.size * 0.6;
+        mini.pathProgress = enemy.pathProgress - 0.3 + i * 0.6;
+        mini.reward = Math.floor(enemy.reward * 0.4);
+        mini.isMini = true;
+        mini.speed = enemy.baseSpeed * 1.3;
+        mini.baseSpeed = mini.speed;
+        const pos = getPathPosition(mini.pathProgress);
+        mini.x = pos.x; mini.y = pos.y;
+        enemies.push(mini);
+      }
+      spawnFloatingText(enemy.x, enemy.y - 30, 'SPLIT!', '#44ffaa', 16);
+    }
   }
 }
 
@@ -1024,6 +1055,7 @@ function generateWave(num) {
   const walkerCount = num >= 3 ? Math.floor(1 + (num - 2) * 1.2) : 0;
   const phantomCount = num >= 4 ? Math.floor((num - 3) * 0.7) : 0;
   const heavyCount = num >= 6 ? Math.floor((num - 5) * 0.6) : 0;
+  const splitterCount = num >= 5 ? Math.floor((num - 4) * 0.5) : 0;
   const hasBoss = num > 0 && num % 5 === 0;
   let t = 0;
   for (let i = 0; i < droneCount; i++) {
@@ -1034,6 +1066,11 @@ function generateWave(num) {
   for (let i = 0; i < phantomCount; i++) {
     w.push({ type: 'phantom', time: t, hpMult });
     t += 0.6;
+  }
+  t += 0.3;
+  for (let i = 0; i < splitterCount; i++) {
+    w.push({ type: 'splitter', time: t, hpMult });
+    t += 1.0;
   }
   t += 0.3;
   for (let i = 0; i < walkerCount; i++) {
@@ -1063,6 +1100,8 @@ function getWavePreview(num) {
   if (walkerCount > 0) preview.walker = walkerCount;
   const heavyCount = num >= 6 ? Math.floor((num - 5) * 0.6) : 0;
   if (heavyCount > 0) preview.heavy = heavyCount;
+  const splitterCount = num >= 5 ? Math.floor((num - 4) * 0.5) : 0;
+  if (splitterCount > 0) preview.splitter = splitterCount;
   if (num > 0 && num % 5 === 0) preview.boss = 1;
   return preview;
 }
@@ -1076,9 +1115,70 @@ function startWave() {
   playSfx('wave');
 }
 
+// ─── ABILITY SYSTEM ──────────────────────────────
+function activateAbility(idx) {
+  const ab = abilities[idx];
+  if (ab.timer > 0) return; // still on cooldown
+  ab.timer = ab.cooldown;
+  
+  if (ab.id === 'emp') {
+    // Stun all enemies for 2 seconds
+    for (const e of enemies) {
+      if (!e.dead) {
+        e.stunTimer = 2;
+        spawnParticles(e.x, e.y, '#00ccff', 3, 40, 0.3);
+      }
+    }
+    screenShake.intensity = 6;
+    spawnFloatingText(logicalW / 2, logicalH * 0.35, '\u26A1 EMP BLAST! \u26A1', '#00ccff', 28);
+    playSfx('explode');
+    // Flash effect
+    for (let i = 0; i < 30; i++) {
+      const angle = Math.random() * Math.PI * 2;
+      const r = Math.random() * gridW * 0.5;
+      spawnParticles(logicalW / 2 + Math.cos(angle) * r, logicalH * 0.4 + Math.sin(angle) * r, '#00ccff', 1, 60, 0.5);
+    }
+  } else if (ab.id === 'airstrike') {
+    // Deal damage to all enemies
+    const dmg = 150 + wave * 15;
+    for (const e of enemies) {
+      if (!e.dead) {
+        dealDamage(e, dmg, 'airstrike');
+        spawnParticles(e.x, e.y, '#ff4400', 4, 60, 0.3);
+      }
+    }
+    screenShake.intensity = 10;
+    spawnFloatingText(logicalW / 2, logicalH * 0.35, '\u{1F4A5} AIRSTRIKE! \u{1F4A5}', '#ff4400', 28);
+    playSfx('explode');
+    // Explosion particles across the field
+    for (let i = 0; i < 20; i++) {
+      const px = gridX + Math.random() * gridW;
+      const py = gridY + Math.random() * gridH;
+      spawnExplosion(px, py, '#ff6600', false);
+    }
+  } else if (ab.id === 'shield') {
+    // Grant 3 shield charges
+    shieldCharges = 3;
+    spawnFloatingText(logicalW / 2, logicalH * 0.35, '\u{1F6E1} SHIELD x3! \u{1F6E1}', '#44ff88', 28);
+    playSfx('wave');
+    spawnParticles(logicalW / 2, logicalH * 0.5, '#44ff88', 15, 100, 0.5);
+  }
+}
+
 // ─── UPDATE ──────────────────────────────────────
 function update(dt) {
   gameTime += dt;
+  
+  // Ability cooldowns
+  for (const ab of abilities) {
+    if (ab.timer > 0) ab.timer -= dt;
+  }
+  
+  // Combo timer
+  if (comboTimer > 0) {
+    comboTimer -= dt;
+    if (comboTimer <= 0) comboCount = 0;
+  }
   
   // Screen shake decay
   if (screenShake.intensity > 0) {
@@ -1122,11 +1222,40 @@ function update(dt) {
       spawnFloatingText(COLS * CELL / 2, ROWS * CELL / 2, '+1 ❤', '#66aaff', 20);
     }
     waveBanner = { text: 'WAVE ' + wave + ' CLEARED! +' + bonus + '¢  ⚡+' + tp + 'tp' + regenMsg, alpha: 1, timer: 2.5 };
+    // Auto-wave countdown
+    if (autoWave) autoWaveTimer = AUTO_WAVE_DELAY;
+  }
+
+  // Auto-wave timer
+  if (autoWave && !waveActive && gamePhase === 'playing' && wave > 0) {
+    autoWaveTimer -= dt;
+    if (autoWaveTimer <= 0) {
+      startWave();
+      autoWaveTimer = 0;
+    }
   }
 
   // Update enemies
   for (const e of enemies) {
     if (e.dead) continue;
+    // Stun timer
+    if (e.stunTimer > 0) {
+      e.stunTimer -= dt;
+      continue; // skip movement while stunned
+    }
+    // Boss minion spawn at 50% HP
+    if (e.type === 'boss' && !e.spawnedMinions && e.hp < e.maxHp * 0.5) {
+      e.spawnedMinions = true;
+      for (let i = 0; i < 3; i++) {
+        const minion = createEnemy('drone', 1 + (wave - 1) * 0.18);
+        minion.pathProgress = Math.max(0, e.pathProgress - 1 - i * 0.5);
+        const pos = getPathPosition(minion.pathProgress);
+        minion.x = pos.x; minion.y = pos.y;
+        enemies.push(minion);
+      }
+      spawnFloatingText(e.x, e.y - 30, '\u{1F6A8} MINIONS!', '#ffcc00', 18);
+      screenShake.intensity = 6;
+    }
     // Slow timer
     if (e.slowTimer > 0) {
       e.slowTimer -= dt;
@@ -1172,6 +1301,13 @@ function update(dt) {
     // Reached end
     if (e.pathProgress >= fullPath.length - 1) {
       e.dead = true;
+      // Shield ability blocks leaks
+      if (shieldCharges > 0) {
+        shieldCharges--;
+        spawnFloatingText(e.x, e.y - 15, '\u{1F6E1} BLOCKED!', '#44ff88', 18);
+        spawnParticles(e.x, e.y, '#44ff88', 10, 80, 0.4);
+        continue;
+      }
       lives--;
       screenShake.intensity = 5;
       spawnParticles(e.x, e.y, '#ff0044', 8, 80, 0.3);
@@ -2497,6 +2633,51 @@ function drawEnemy(e) {
     ctx.beginPath();
     ctx.arc(0, 0, size * 0.4 + Math.sin(gameTime * 5) * 3, 0, Math.PI * 2);
     ctx.fill();
+  } else if (e.shape === 'hexagon') {
+    // Splitter — hexagon with pulsing core
+    ctx.rotate(gameTime * 2);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI * 2 / 6 * i;
+      const x = Math.cos(a) * size * 1.15;
+      const y = Math.sin(a) * size * 1.15;
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Split line through center
+    ctx.strokeStyle = '#ffffff44';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, -size * 1.1);
+    ctx.lineTo(0, size * 1.1);
+    ctx.stroke();
+    // Two inner dots (hint at splitting)
+    ctx.fillStyle = '#ffffff66';
+    ctx.beginPath();
+    ctx.arc(-size * 0.3, 0, size * 0.2, 0, Math.PI * 2);
+    ctx.arc(size * 0.3, 0, size * 0.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  // Stun visual
+  if (e.stunTimer > 0) {
+    ctx.strokeStyle = '#00ccff';
+    ctx.lineWidth = 2;
+    ctx.globalAlpha = 0.6 + Math.sin(gameTime * 15) * 0.3;
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 1.5, 0, Math.PI * 2);
+    ctx.stroke();
+    // Stun stars
+    ctx.fillStyle = '#ffcc00';
+    ctx.font = '10px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    for (let i = 0; i < 3; i++) {
+      const sa = gameTime * 4 + i * Math.PI * 2 / 3;
+      ctx.fillText('\u2605', Math.cos(sa) * size * 1.3, Math.sin(sa) * size * 1.3 - 4);
+    }
+    ctx.globalAlpha = 1;
   }
   ctx.restore();
   // Health bar
@@ -2657,6 +2838,79 @@ function drawHUD() {
   ctx.fillStyle = '#666688';
   ctx.fillText('HI: ' + highScore, W - 20, 90);
 
+  // ── ABILITY BUTTONS ──
+  abilityBtnBounds = [];
+  const abStartX = 140;
+  const abY = 16;
+  const abW = 52, abH = 48;
+  const abGap = 6;
+  for (let i = 0; i < abilities.length; i++) {
+    const ab = abilities[i];
+    const ax = abStartX + i * (abW + abGap);
+    const ready = ab.timer <= 0;
+    const cdRatio = ready ? 0 : ab.timer / ab.cooldown;
+    abilityBtnBounds.push({ x: ax, y: abY, w: abW, h: abH });
+    // Background
+    ctx.fillStyle = ready ? ab.color + '18' : 'rgba(10,5,20,0.7)';
+    ctx.strokeStyle = ready ? ab.color + '88' : '#22223344';
+    ctx.lineWidth = ready ? 1.5 : 1;
+    roundedRect(ax, abY, abW, abH, 4);
+    ctx.fill();
+    ctx.stroke();
+    // Cooldown overlay
+    if (!ready) {
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.fillRect(ax + 1, abY + 1, abW - 2, (abH - 2) * cdRatio);
+    }
+    // Icon
+    ctx.font = '18px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = ready ? ab.color : '#333344';
+    ctx.fillText(ab.icon, ax + abW / 2, abY + 16);
+    // Key hint
+    ctx.font = 'bold 9px monospace';
+    ctx.fillStyle = ready ? '#ccccee' : '#444455';
+    ctx.fillText('[' + ab.key + ']', ax + abW / 2, abY + 32);
+    // Cooldown time or READY
+    ctx.font = '8px monospace';
+    if (ready) {
+      ctx.fillStyle = ab.color;
+      ctx.fillText('READY', ax + abW / 2, abY + 42);
+    } else {
+      ctx.fillStyle = '#666677';
+      ctx.fillText(Math.ceil(ab.timer) + 's', ax + abW / 2, abY + 42);
+    }
+  }
+  // Shield charges indicator
+  if (shieldCharges > 0) {
+    ctx.font = 'bold 13px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    ctx.fillStyle = '#44ff88';
+    ctx.fillText('\u{1F6E1} x' + shieldCharges, abStartX + 3 * (abW + abGap) + 4, abY + 12);
+  }
+
+  // ── COMBO DISPLAY ──
+  if (comboCount >= 3) {
+    const comboAlpha = comboTimer / COMBO_TIMEOUT;
+    ctx.globalAlpha = comboAlpha;
+    ctx.font = 'bold ' + Math.min(24, 16 + comboCount * 0.5) + 'px monospace';
+    ctx.fillStyle = comboCount >= 25 ? '#ffcc00' : comboCount >= 10 ? '#ff00ff' : '#ff6644';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'top';
+    ctx.fillText('\u26A1 COMBO x' + comboCount, W / 2, gridY - 30);
+    // Combo timer bar
+    const cbW = 100, cbH = 3;
+    const cbX = W / 2 - cbW / 2;
+    const cbY = gridY - 12;
+    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillRect(cbX, cbY, cbW, cbH);
+    ctx.fillStyle = comboCount >= 10 ? '#ff00ff' : '#ff6644';
+    ctx.fillRect(cbX, cbY, cbW * (comboTimer / COMBO_TIMEOUT), cbH);
+    ctx.globalAlpha = 1;
+  }
+
   // Enemies remaining
   if (waveActive) {
     ctx.font = '13px "Segoe UI", monospace';
@@ -2721,7 +2975,7 @@ function drawHUD() {
   if (isMobile) {
     ctx.fillText('TAP — place/select  |  SWIPE ↕ — camera  |  ⚡ tech tree', W / 2, 4);
   } else {
-    ctx.fillText('1-8 towers  |  SPACE wave  |  TAB tech  |  +/- speed  |  A auto-wave  |  RMB sell', W / 2, 4);
+    ctx.fillText('1-8 towers  |  SPACE wave  |  TAB tech  |  Q/W/E abilities  |  A auto  |  RMB sell', W / 2, 4);
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
@@ -3065,6 +3319,15 @@ canvas.addEventListener('click', e => {
     }
   }
 
+  // Check ability buttons
+  for (let i = 0; i < abilityBtnBounds.length; i++) {
+    const b = abilityBtnBounds[i];
+    if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      activateAbility(i);
+      return;
+    }
+  }
+
   // Check auto-wave button
   if (autoWaveBtnBounds) {
     const b = autoWaveBtnBounds;
@@ -3215,6 +3478,13 @@ document.addEventListener('keydown', e => {
   if (e.key === 'a' || e.key === 'A') {
     autoWave = !autoWave;
   }
+  // Abilities
+  if (e.key === 'q' || e.key === 'Q') activateAbility(0);
+  if (e.key === 'w' || e.key === 'W') {
+    // Only if not trying to type — prevent conflict with movement
+    if (!e.ctrlKey && !e.altKey) activateAbility(1);
+  }
+  if (e.key === 'e' || e.key === 'E') activateAbility(2);
 });
 
 // ─── GAME LOOP ───────────────────────────────────
@@ -3270,6 +3540,9 @@ function initGame() {
   creditsEarned = 0;
   floatingTexts = [];
   autoWaveTimer = 0;
+  shieldCharges = 0;
+  // Reset abilities
+  for (const ab of abilities) ab.timer = 0;
   // Reset tower locks
   for (const key of Object.keys(TOWER_DEFS)) {
     TOWER_DEFS[key].locked = ['flame','sniper','pulse','void'].includes(key);
@@ -3374,6 +3647,15 @@ canvas.addEventListener('touchend', e => {
     if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
       const idx = SPEED_OPTIONS.indexOf(gameSpeed);
       gameSpeed = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+      return;
+    }
+  }
+
+  // Check ability buttons
+  for (let i = 0; i < abilityBtnBounds.length; i++) {
+    const b = abilityBtnBounds[i];
+    if (b && mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      activateAbility(i);
       return;
     }
   }
