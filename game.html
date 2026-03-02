@@ -79,14 +79,24 @@ const TOWER_DEFS = {
 
 // ─── TECH TREE ───────────────────────────────────
 const TECH_TREE = [
-  { id:'flame',  name:'FLAME TOWER',  unlocks:'flame',  cost:100, requires:null,    col:0, row:0, color:'#ff6600', desc:'Unlocks Flame Tower — burns enemies in area' },
-  { id:'sniper', name:'SNIPER TOWER', unlocks:'sniper', cost:150, requires:null,    col:1, row:0, color:'#88ff44', desc:'Unlocks Sniper Tower — extreme range, high damage' },
-  { id:'pulse',  name:'PULSE TOWER',  unlocks:'pulse',  cost:200, requires:'flame', col:0, row:1, color:'#ff44aa', desc:'Unlocks Pulse Tower — pushes enemies back' },
-  { id:'void',   name:'VOID TOWER',   unlocks:'void',   cost:300, requires:'sniper',col:1, row:1, color:'#aa00ff', desc:'Unlocks Void Tower — deals % of max HP' },
-  { id:'dmg1',   name:'DAMAGE +20%',  unlocks:null,     cost:80,  requires:null,    col:2, row:0, color:'#ffcc00', desc:'All towers deal 20% more damage' },
-  { id:'range1', name:'RANGE +15%',   unlocks:null,     cost:80,  requires:null,    col:3, row:0, color:'#00ffcc', desc:'All towers get 15% more range' },
-  { id:'dmg2',   name:'DAMAGE +30%',  unlocks:null,     cost:200, requires:'dmg1',  col:2, row:1, color:'#ffdd44', desc:'All towers deal 30% more damage' },
-  { id:'rate1',  name:'FIRE RATE +20%',unlocks:null,     cost:200, requires:'range1',col:3, row:1, color:'#44ffcc', desc:'All towers fire 20% faster' }
+  // ═══ ROW 0 — Tier 1 (base) ═══
+  { id:'flame',  name:'FLAME TOWER',    unlocks:'flame',  cost:80,  requires:null,     col:0, row:0, color:'#ff6600', desc:'Unlocks Flame Tower — burns enemies in area' },
+  { id:'sniper', name:'SNIPER TOWER',   unlocks:'sniper', cost:100, requires:null,     col:1, row:0, color:'#88ff44', desc:'Unlocks Sniper — extreme range, high damage' },
+  { id:'dmg1',   name:'DAMAGE +20%',    unlocks:null,     cost:60,  requires:null,     col:2, row:0, color:'#ffcc00', desc:'All towers deal 20% more damage' },
+  { id:'range1', name:'RANGE +15%',     unlocks:null,     cost:60,  requires:null,     col:3, row:0, color:'#00ffcc', desc:'All towers get 15% more range' },
+  { id:'econ1',  name:'INCOME +25%',    unlocks:null,     cost:70,  requires:null,     col:4, row:0, color:'#ffaa00', desc:'Kill rewards increased by 25%' },
+  // ═══ ROW 1 — Tier 2 (requires tier 1) ═══
+  { id:'pulse',  name:'PULSE TOWER',    unlocks:'pulse',  cost:150, requires:'flame',  col:0, row:1, color:'#ff44aa', desc:'Unlocks Pulse — pushes enemies back' },
+  { id:'void',   name:'VOID TOWER',     unlocks:'void',   cost:200, requires:'sniper', col:1, row:1, color:'#aa00ff', desc:'Unlocks Void — deals % of max HP' },
+  { id:'dmg2',   name:'DAMAGE +30%',    unlocks:null,     cost:150, requires:'dmg1',   col:2, row:1, color:'#ffdd44', desc:'All towers deal 30% more damage' },
+  { id:'rate1',  name:'FIRE RATE +20%', unlocks:null,     cost:150, requires:'range1', col:3, row:1, color:'#44ffcc', desc:'All towers fire 20% faster' },
+  { id:'reveal', name:'STEALTH SCAN',   unlocks:null,     cost:120, requires:'econ1',  col:4, row:1, color:'#88aaff', desc:'All towers detect stealth enemies' },
+  // ═══ ROW 2 — Tier 3 (requires tier 2) ═══
+  { id:'burn',   name:'BURN DOT',       unlocks:null,     cost:250, requires:'pulse',  col:0, row:2, color:'#ff4400', desc:'Flame & Pulse set enemies on fire (DOT)' },
+  { id:'crit',   name:'CRIT ×2',        unlocks:null,     cost:250, requires:'void',   col:1, row:2, color:'#ff00aa', desc:'15% chance to deal double damage' },
+  { id:'dmg3',   name:'DAMAGE +50%',    unlocks:null,     cost:300, requires:'dmg2',   col:2, row:2, color:'#ffee66', desc:'All towers deal 50% more damage' },
+  { id:'multi',  name:'MULTISHOT',      unlocks:null,     cost:280, requires:'rate1',  col:3, row:2, color:'#66ffdd', desc:'Laser & Sniper hit 1 extra target' },
+  { id:'regen',  name:'REGENERATION',   unlocks:null,     cost:200, requires:'reveal', col:4, row:2, color:'#66aaff', desc:'+1 life every 3 waves cleared' }
 ];
 let unlockedTech = new Set();
 let techPoints = 0; // earned per wave
@@ -1219,7 +1229,7 @@ function update(dt) {
     if (unlockedTech.has('regen') && wave % 3 === 0) {
       lives = Math.min(lives + 1, 20);
       regenMsg = '  ❤+1';
-      spawnFloatingText(COLS * CELL / 2, ROWS * CELL / 2, '+1 ❤', '#66aaff', 20);
+      spawnFloatingText(gridX + gridW / 2, gridY + gridH / 2, '+1 ❤', '#66aaff', 20);
     }
     waveBanner = { text: 'WAVE ' + wave + ' CLEARED! +' + bonus + '¢  ⚡+' + tp + 'tp' + regenMsg, alpha: 1, timer: 2.5 };
     // Auto-wave countdown
@@ -1760,27 +1770,54 @@ function drawSkyView(W, H) {
   ctx.textBaseline = 'middle';
   ctx.font = 'bold 36px "Segoe UI", monospace';
   ctx.fillStyle = '#ff00ff';
-  ctx.fillText('TECH TREE', W / 2, H * 0.22);
+  ctx.fillText('TECH TREE', W / 2, H * 0.15);
+  // Subtitle
+  ctx.font = '14px monospace';
+  ctx.fillStyle = '#886699';
+  ctx.fillText('Unlock upgrades with ⚡ Tech Points earned each wave', W / 2, H * 0.19);
 
-  // Tech points display
-  ctx.font = 'bold 18px monospace';
+  // Tech points + unlocked count
+  ctx.font = 'bold 20px monospace';
   ctx.fillStyle = '#ffcc00';
-  ctx.fillText('\u26A1 Tech Points: ' + techPoints, W / 2, H * 0.27);
+  ctx.fillText('\u26A1 ' + techPoints + ' TP', W / 2, H * 0.235);
+  ctx.font = '12px monospace';
+  ctx.fillStyle = '#666688';
+  ctx.fillText(unlockedTech.size + '/' + TECH_TREE.length + ' unlocked', W / 2, H * 0.265);
 
   // Draw tech tree nodes — responsive
   techTreeBtns = [];
-  const nodeW = Math.min(150, W * 0.17);
-  const nodeH = nodeW < 100 ? 55 : 72;
-  const gapX = nodeW + (nodeW < 100 ? 8 : 18);
-  const gapY = nodeH + (nodeW < 100 ? 12 : 25);
+  const nodeW = Math.min(140, W * 0.16);
+  const nodeH = nodeW < 90 ? 50 : 65;
+  const gapX = nodeW + (nodeW < 90 ? 6 : 14);
+  const gapY = nodeH + (nodeW < 90 ? 18 : 35);
   const treeCols = 5;
+  const treeRows = 3;
   const treeW = treeCols * gapX - (gapX - nodeW);
   const treeBaseX = (W - treeW) / 2;
-  const treeBaseY = H * 0.32;
+  const treeBaseY = H * 0.30;
 
-  // Draw connections first
-  ctx.strokeStyle = '#333355';
-  ctx.lineWidth = 2;
+  // Tier labels on the left
+  const tierLabels = ['TIER 1', 'TIER 2', 'TIER 3'];
+  const tierColors = ['#00ffcc', '#ff00ff', '#ff4400'];
+  for (let r = 0; r < treeRows; r++) {
+    const ly = treeBaseY + r * gapY + nodeH / 2;
+    ctx.font = 'bold 11px monospace';
+    ctx.textAlign = 'right';
+    ctx.textBaseline = 'middle';
+    ctx.fillStyle = tierColors[r] + '66';
+    ctx.fillText(tierLabels[r], treeBaseX - 12, ly);
+    // Horizontal line across tier
+    ctx.strokeStyle = tierColors[r] + '15';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([4, 8]);
+    ctx.beginPath();
+    ctx.moveTo(treeBaseX - 6, ly);
+    ctx.lineTo(treeBaseX + treeW + 6, ly);
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  // Draw connections (animated flow)
   for (const tech of TECH_TREE) {
     if (tech.requires) {
       const parent = TECH_TREE.find(t => t.id === tech.requires);
@@ -1789,12 +1826,40 @@ function drawSkyView(W, H) {
         const py = treeBaseY + parent.row * gapY + nodeH;
         const cx2 = treeBaseX + tech.col * gapX + nodeW / 2;
         const cy2 = treeBaseY + tech.row * gapY;
-        const unlocked = unlockedTech.has(parent.id);
-        ctx.strokeStyle = unlocked ? tech.color + '55' : '#222233';
+        const parentUnlocked = unlockedTech.has(parent.id);
+        const childUnlocked = unlockedTech.has(tech.id);
+        
+        // Connection line
+        ctx.lineWidth = parentUnlocked ? 2.5 : 1.5;
+        if (childUnlocked) {
+          ctx.strokeStyle = tech.color + 'aa';
+        } else if (parentUnlocked) {
+          ctx.strokeStyle = tech.color + '55';
+          // Animated glow on available connections
+          const pulse = 0.3 + Math.sin(gameTime * 3 + tech.col) * 0.2;
+          ctx.globalAlpha = pulse + 0.3;
+        } else {
+          ctx.strokeStyle = '#222233';
+        }
+        // Curved bezier connection
+        const midY = (py + cy2) / 2;
         ctx.beginPath();
         ctx.moveTo(px, py);
-        ctx.lineTo(cx2, cy2);
+        ctx.bezierCurveTo(px, midY, cx2, midY, cx2, cy2);
         ctx.stroke();
+        ctx.globalAlpha = 1;
+        
+        // Arrow head at the child end
+        if (parentUnlocked && !childUnlocked) {
+          ctx.fillStyle = tech.color + '88';
+          const arrowSize = 5;
+          ctx.beginPath();
+          ctx.moveTo(cx2, cy2);
+          ctx.lineTo(cx2 - arrowSize, cy2 - arrowSize * 1.5);
+          ctx.lineTo(cx2 + arrowSize, cy2 - arrowSize * 1.5);
+          ctx.closePath();
+          ctx.fill();
+        }
       }
     }
   }
@@ -1813,84 +1878,135 @@ function drawSkyView(W, H) {
     if (isUnlocked) {
       ctx.fillStyle = tech.color + '22';
       ctx.strokeStyle = tech.color + 'aa';
+      // Subtle pulsing glow for unlocked
+      ctx.shadowColor = tech.color;
+      ctx.shadowBlur = 8 + Math.sin(gameTime * 2 + tech.col) * 4;
     } else if (canUnlock) {
       ctx.fillStyle = 'rgba(20,10,40,0.85)';
       ctx.strokeStyle = tech.color + '88';
+      // Pulsing border for available
+      const pulseAlpha = Math.floor((0.5 + Math.sin(gameTime * 4) * 0.3) * 255).toString(16).padStart(2,'0');
+      ctx.strokeStyle = tech.color + pulseAlpha;
     } else {
       ctx.fillStyle = 'rgba(10,5,20,0.7)';
       ctx.strokeStyle = '#222233';
     }
     ctx.lineWidth = isUnlocked ? 2 : 1.5;
-    roundedRect(nx, ny, nodeW, nodeH, 6);
+    roundedRect(nx, ny, nodeW, nodeH, 8);
     ctx.fill();
     ctx.stroke();
+    ctx.shadowBlur = 0;
+    
     // Hover glow
     const skyOffset = camYSmooth * H;
     const localMY = mouseY - skyOffset + H;
-    if (canUnlock && mouseX >= nx && mouseX <= nx + nodeW && localMY >= ny && localMY <= ny + nodeH && camYSmooth > 0.7) {
-      ctx.fillStyle = tech.color + '15';
-      roundedRect(nx, ny, nodeW, nodeH, 6);
+    if ((canUnlock || isUnlocked) && mouseX >= nx && mouseX <= nx + nodeW && localMY >= ny && localMY <= ny + nodeH && camYSmooth > 0.7) {
+      ctx.fillStyle = tech.color + '18';
+      roundedRect(nx, ny, nodeW, nodeH, 8);
       ctx.fill();
       hoveredTechNode = tech;
+      // Tooltip at bottom
+      if (!isUnlocked) {
+        const ttY = treeBaseY + treeRows * gapY + 10;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        ctx.font = 'bold 14px monospace';
+        ctx.fillStyle = tech.color;
+        ctx.fillText(tech.name, W / 2, ttY);
+        ctx.font = '12px monospace';
+        ctx.fillStyle = '#aabbcc';
+        ctx.fillText(tech.desc, W / 2, ttY + 20);
+        ctx.font = '12px monospace';
+        ctx.fillStyle = techPoints >= tech.cost ? '#ffcc00' : '#ff4444';
+        ctx.fillText('\u26A1 Cost: ' + tech.cost + ' TP' + (tech.requires ? '  |  Requires: ' + tech.requires.toUpperCase() : ''), W / 2, ttY + 38);
+      }
     }
 
-    // Icon (tower shape or star)
+    // Icon
     ctx.globalAlpha = isLocked ? 0.25 : 1;
-    const iconOff = nodeW < 100 ? 18 : 26;
-    const textOff = nodeW < 100 ? 34 : 48;
-    const iconSz = nodeW < 100 ? 10 : 15;
+    const iconX = nx + (nodeW < 90 ? 16 : 22);
+    const iconY = ny + nodeH / 2;
+    const iconSz = nodeW < 90 ? 9 : 13;
     if (tech.unlocks) {
-      drawTowerShape(nx + iconOff, ny + nodeH / 2, tech.unlocks, tech.color, iconSz, gameTime * (isUnlocked ? 1 : 0.3), 1);
+      drawTowerShape(iconX, iconY, tech.unlocks, tech.color, iconSz, gameTime * (isUnlocked ? 1 : 0.3), 1);
     } else {
-      // Stat upgrade icon — different per type
       ctx.fillStyle = tech.color;
-      ctx.font = (nodeW < 100 ? '14' : '20') + 'px monospace';
+      ctx.font = (nodeW < 90 ? '16' : '22') + 'px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      const icon = tech.id.startsWith('dmg') ? '\u2694' :
+      const icon = tech.id.startsWith('dmg') ? '\u2694\uFE0F' :
                    tech.id.startsWith('range') ? '\u25CE' :
                    tech.id.startsWith('rate') ? '\u26A1' :
-                   tech.id.startsWith('econ') ? '\u2B50' :
-                   tech.id === 'reveal' ? '\u{1F441}' :
+                   tech.id.startsWith('econ') ? '\u{1F4B0}' :
+                   tech.id === 'reveal' ? '\u{1F441}\uFE0F' :
                    tech.id === 'burn' ? '\u{1F525}' :
-                   tech.id === 'crit' ? '\u2620' :
-                   tech.id === 'multi' ? '\u2726' :
-                   tech.id === 'regen' ? '\u2764' : '\u2B06';
-      ctx.fillText(icon, nx + iconOff, ny + nodeH / 2);
+                   tech.id === 'crit' ? '\u{1F480}' :
+                   tech.id === 'multi' ? '\u{1F4AB}' :
+                   tech.id === 'regen' ? '\u{2764}\uFE0F' : '\u2B06';
+      ctx.fillText(icon, iconX, iconY);
     }
     ctx.globalAlpha = 1;
 
     // Name
-    ctx.font = 'bold ' + (nodeW < 100 ? '9' : '12') + 'px monospace';
+    const textOff = nodeW < 90 ? 32 : 42;
+    ctx.font = 'bold ' + (nodeW < 90 ? '8' : '11') + 'px monospace';
     ctx.fillStyle = isLocked ? '#444455' : tech.color;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(tech.name, nx + textOff, ny + (nodeW < 100 ? 4 : 8));
+    ctx.fillText(tech.name, nx + textOff, ny + (nodeW < 90 ? 5 : 7));
 
     // Cost or UNLOCKED
-    ctx.font = (nodeW < 100 ? '8' : '11') + 'px monospace';
+    ctx.font = (nodeW < 90 ? '7' : '10') + 'px monospace';
     if (isUnlocked) {
       ctx.fillStyle = '#00ff88';
-      ctx.fillText('\u2713 UNLOCKED', nx + textOff, ny + (nodeW < 100 ? 16 : 24));
+      ctx.fillText('\u2713 UNLOCKED', nx + textOff, ny + (nodeW < 90 ? 16 : 21));
     } else {
       ctx.fillStyle = canUnlock ? '#ffcc00' : '#444455';
-      ctx.fillText('\u26A1 ' + tech.cost + ' pts', nx + textOff, ny + (nodeW < 100 ? 16 : 24));
+      ctx.fillText('\u26A1 ' + tech.cost + ' pts', nx + textOff, ny + (nodeW < 90 ? 16 : 21));
     }
 
-    // Description
-    if (nodeW >= 100) {
-      ctx.font = '10px monospace';
-      ctx.fillStyle = isLocked ? '#333344' : '#888899';
-      const maxChars = Math.floor((nodeW - textOff - 4) / 6);
-      ctx.fillText(tech.desc.substring(0, maxChars), nx + textOff, ny + 40);
-      if (tech.desc.length > maxChars) ctx.fillText(tech.desc.substring(maxChars, maxChars * 2), nx + textOff, ny + 53);
-    } else {
-      ctx.font = '7px monospace';
-      ctx.fillStyle = isLocked ? '#333344' : '#888899';
-      const maxChars = Math.floor((nodeW - textOff - 4) / 4);
-      ctx.fillText(tech.desc.substring(0, maxChars), nx + textOff, ny + 30);
+    // Brief description (only on larger screens)
+    if (nodeW >= 90) {
+      ctx.font = '9px monospace';
+      ctx.fillStyle = isLocked ? '#222233' : '#667788';
+      const maxChars = Math.floor((nodeW - textOff - 4) / 5.5);
+      ctx.fillText(tech.desc.substring(0, maxChars), nx + textOff, ny + 35);
+      if (tech.desc.length > maxChars && nodeH > 56) {
+        ctx.fillText(tech.desc.substring(maxChars, maxChars * 2), nx + textOff, ny + 48);
+      }
+    }
+
+    // Unlocked checkmark overlay
+    if (isUnlocked) {
+      ctx.globalAlpha = 0.15;
+      ctx.font = 'bold 30px monospace';
+      ctx.fillStyle = tech.color;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('\u2713', nx + nodeW - 16, ny + nodeH / 2);
+      ctx.globalAlpha = 1;
     }
   }
+
+  // Progress bar at bottom
+  const progW = treeW * 0.6;
+  const progH = 8;
+  const progX = (W - progW) / 2;
+  const progY = treeBaseY + treeRows * gapY + 60;
+  const progRatio = unlockedTech.size / TECH_TREE.length;
+  ctx.fillStyle = 'rgba(20,10,40,0.5)';
+  roundedRect(progX, progY, progW, progH, 4);
+  ctx.fill();
+  ctx.fillStyle = '#ff00ff';
+  if (progRatio > 0) {
+    roundedRect(progX, progY, progW * progRatio, progH, 4);
+    ctx.fill();
+  }
+  ctx.font = '10px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'top';
+  ctx.fillStyle = '#888899';
+  ctx.fillText('Progress: ' + Math.floor(progRatio * 100) + '%', W / 2, progY + 12);
 
   ctx.textAlign = 'left';
 }
