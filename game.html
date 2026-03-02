@@ -2667,103 +2667,96 @@ function drawPath() {
   if (fullPath.length < 2) return;
   const pw = cellSize * 0.72; // path width
 
-  // Build center-line points
-  const pts = fullPath.map(([c,r]) => cellToWorld(c,r));
+  // Build corner-only waypoints (skip intermediate cells on straight segments)
+  const corners = [fullPath[0]];
+  for (let i = 1; i < fullPath.length - 1; i++) {
+    const [px, py] = fullPath[i - 1];
+    const [cx, cy] = fullPath[i];
+    const [nx, ny] = fullPath[i + 1];
+    if ((cx - px) !== (nx - cx) || (cy - py) !== (ny - cy)) {
+      corners.push(fullPath[i]);
+    }
+  }
+  corners.push(fullPath[fullPath.length - 1]);
+
+  // Convert corner grid coords to pixel positions
+  const cpts = corners.map(([c, r]) => cellToWorld(c, r));
 
   ctx.save();
 
-  // ── 1. Fill each path cell as a rounded rectangle (no corner gaps) ──
-  const roadGrad = ctx.createLinearGradient(gridX, gridY, gridX+gridW, gridY+gridH);
+  // ── 1. Road body — single thick stroke through corners with round joins ──
+  const roadGrad = ctx.createLinearGradient(gridX, gridY, gridX + gridW, gridY + gridH);
   roadGrad.addColorStop(0, 'rgba(10,0,30,0.85)');
   roadGrad.addColorStop(0.5, 'rgba(15,0,40,0.9)');
   roadGrad.addColorStop(1, 'rgba(10,0,30,0.85)');
 
-  // Outer glow — fill rectangles slightly larger
-  ctx.fillStyle = 'rgba(0,255,255,0.03)';
-  for (const p of pts) {
-    ctx.fillRect(p.x - pw/2 - 4, p.y - pw/2 - 4, pw + 8, pw + 8);
-  }
-
-  // Main road body — fill each cell
-  ctx.fillStyle = roadGrad;
-  for (const p of pts) {
-    ctx.fillRect(p.x - pw/2, p.y - pw/2, pw, pw);
-  }
-
-  // ── 2. Smooth corner overlays — fill rounded corners to hide seams ──
-  // At direction changes, draw a circle to blend the corner
-  for (let i = 1; i < fullPath.length - 1; i++) {
-    const [px, py] = fullPath[i-1];
-    const [cx, cy] = fullPath[i];
-    const [nx, ny] = fullPath[i+1];
-    // Check if direction changes at this point
-    const dx1 = cx - px, dy1 = cy - py;
-    const dx2 = nx - cx, dy2 = ny - cy;
-    if (dx1 !== dx2 || dy1 !== dy2) {
-      // Direction change — draw circle overlay
-      const wp = pts[i];
-      ctx.fillStyle = roadGrad;
-      ctx.beginPath();
-      ctx.arc(wp.x, wp.y, pw / 2 + 1, 0, Math.PI * 2);
-      ctx.fill();
-    }
-  }
-
-  // ── 3. Neon edge lines ──
-  ctx.lineWidth = 1.5;
-  ctx.strokeStyle = 'rgba(255,0,255,0.5)';
+  // Outer glow
+  ctx.lineWidth = pw + 8;
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
-  const edgeOff = pw / 2 - 1;
+  ctx.strokeStyle = 'rgba(0,255,255,0.03)';
+  ctx.beginPath();
+  cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
 
-  // Build simplified direction-change waypoints for clean edge lines
-  const corners = [pts[0]];
-  for (let i = 1; i < fullPath.length - 1; i++) {
-    const [px, py] = fullPath[i-1];
-    const [cx, cy] = fullPath[i];
-    const [nx, ny] = fullPath[i+1];
-    if ((cx-px) !== (nx-cx) || (cy-py) !== (ny-cy)) {
-      corners.push(pts[i]);
-    }
-  }
-  corners.push(pts[pts.length - 1]);
+  // Main road fill
+  ctx.lineWidth = pw;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = roadGrad;
+  ctx.beginPath();
+  cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  ctx.stroke();
+
+  // ── 2. Neon edge lines ──
+  ctx.lineWidth = 1.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  ctx.strokeStyle = 'rgba(255,0,255,0.5)';
+  const edgeOff = pw / 2 - 1;
 
   for (let side = -1; side <= 1; side += 2) {
     ctx.beginPath();
-    for (let i = 0; i < corners.length - 1; i++) {
-      const dx = corners[i+1].x - corners[i].x;
-      const dy = corners[i+1].y - corners[i].y;
-      const len = Math.hypot(dx,dy) || 1;
-      const nx = -dy/len * edgeOff * side;
-      const ny = dx/len * edgeOff * side;
-      if (i === 0) ctx.moveTo(corners[i].x+nx, corners[i].y+ny);
-      ctx.lineTo(corners[i+1].x+nx, corners[i+1].y+ny);
+    for (let i = 0; i < cpts.length; i++) {
+      // Compute perpendicular offset based on segment direction
+      let dx, dy;
+      if (i < cpts.length - 1) {
+        dx = cpts[i + 1].x - cpts[i].x;
+        dy = cpts[i + 1].y - cpts[i].y;
+      } else {
+        dx = cpts[i].x - cpts[i - 1].x;
+        dy = cpts[i].y - cpts[i - 1].y;
+      }
+      const len = Math.hypot(dx, dy) || 1;
+      const ox = -dy / len * edgeOff * side;
+      const oy = dx / len * edgeOff * side;
+      if (i === 0) ctx.moveTo(cpts[i].x + ox, cpts[i].y + oy);
+      else ctx.lineTo(cpts[i].x + ox, cpts[i].y + oy);
     }
     ctx.stroke();
   }
 
-  // ── 4. Center dashed line (animated) ──
+  // ── 3. Center dashed line (animated) ──
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(0,255,255,0.2)';
   ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
   const dashOffset = (gameTime * 40) % 20;
   ctx.setLineDash([6, 8]);
   ctx.lineDashOffset = -dashOffset;
   ctx.beginPath();
-  corners.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── 5. Entrance & exit markers ──
-  const entry = pts[0];
-  const exit = pts[pts.length - 1];
+  // ── 4. Entrance & exit markers ──
   ctx.fillStyle = '#00ff88';
   ctx.font = 'bold 18px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
-  ctx.fillText('▶', entry.x - 12, entry.y);
+  ctx.fillText('▶', cpts[0].x - 12, cpts[0].y);
   ctx.fillStyle = '#ff0044';
-  ctx.fillText('✕', exit.x + 12, exit.y);
+  ctx.fillText('✕', cpts[cpts.length - 1].x + 12, cpts[cpts.length - 1].y);
 
   ctx.restore();
 }
