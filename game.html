@@ -2684,72 +2684,45 @@ function drawPath() {
 
   ctx.save();
 
-  // ── 1. Road body — single thick stroke through corners with round joins ──
+  // ── Helper: draw the path polyline ──
+  function tracePath() {
+    ctx.beginPath();
+    cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
+  }
+
   const roadGrad = ctx.createLinearGradient(gridX, gridY, gridX + gridW, gridY + gridH);
   roadGrad.addColorStop(0, 'rgba(10,0,30,0.85)');
   roadGrad.addColorStop(0.5, 'rgba(15,0,40,0.9)');
   roadGrad.addColorStop(1, 'rgba(10,0,30,0.85)');
 
-  // Outer glow
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+
+  // ── 1. Outer glow ──
   ctx.lineWidth = pw + 8;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
   ctx.strokeStyle = 'rgba(0,255,255,0.03)';
-  ctx.beginPath();
-  cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-  ctx.stroke();
+  tracePath(); ctx.stroke();
 
-  // Main road fill
-  ctx.lineWidth = pw;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
-  ctx.strokeStyle = roadGrad;
-  ctx.beginPath();
-  cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-  ctx.stroke();
-
-  // ── 2. Neon edge lines ──
-  ctx.lineWidth = 1.5;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  // ── 2. Neon edge border (slightly wider than road) ──
+  ctx.lineWidth = pw + 3;
   ctx.strokeStyle = 'rgba(255,0,255,0.5)';
-  const edgeOff = pw / 2 - 1;
+  tracePath(); ctx.stroke();
 
-  for (let side = -1; side <= 1; side += 2) {
-    ctx.beginPath();
-    for (let i = 0; i < cpts.length; i++) {
-      // Compute perpendicular offset based on segment direction
-      let dx, dy;
-      if (i < cpts.length - 1) {
-        dx = cpts[i + 1].x - cpts[i].x;
-        dy = cpts[i + 1].y - cpts[i].y;
-      } else {
-        dx = cpts[i].x - cpts[i - 1].x;
-        dy = cpts[i].y - cpts[i - 1].y;
-      }
-      const len = Math.hypot(dx, dy) || 1;
-      const ox = -dy / len * edgeOff * side;
-      const oy = dx / len * edgeOff * side;
-      if (i === 0) ctx.moveTo(cpts[i].x + ox, cpts[i].y + oy);
-      else ctx.lineTo(cpts[i].x + ox, cpts[i].y + oy);
-    }
-    ctx.stroke();
-  }
+  // ── 3. Road body on top (covers center, leaving edge border visible) ──
+  ctx.lineWidth = pw;
+  ctx.strokeStyle = roadGrad;
+  tracePath(); ctx.stroke();
 
-  // ── 3. Center dashed line (animated) ──
+  // ── 4. Center dashed line (animated) ──
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(0,255,255,0.2)';
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
   const dashOffset = (gameTime * 40) % 20;
   ctx.setLineDash([6, 8]);
   ctx.lineDashOffset = -dashOffset;
-  ctx.beginPath();
-  cpts.forEach((p, i) => i === 0 ? ctx.moveTo(p.x, p.y) : ctx.lineTo(p.x, p.y));
-  ctx.stroke();
+  tracePath(); ctx.stroke();
   ctx.setLineDash([]);
 
-  // ── 4. Entrance & exit markers ──
+  // ── 5. Entrance & exit markers ──
   ctx.fillStyle = '#00ff88';
   ctx.font = 'bold 18px monospace';
   ctx.textAlign = 'center';
