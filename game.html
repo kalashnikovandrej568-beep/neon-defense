@@ -17,7 +17,13 @@ canvas{display:block}
 @keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
 #gameOverScreen{position:fixed;top:0;left:0;width:100%;height:100%;display:none;flex-direction:column;align-items:center;justify-content:center;z-index:100;background:rgba(10,0,20,.92)}
 #gameOverScreen h1{font-size:60px;color:#ff0044;text-shadow:0 0 30px #ff0044,0 0 80px #ff0044;margin-bottom:20px}
-#gameOverScreen .final-score{font-size:30px;color:#ffcc00;text-shadow:0 0 20px #ffcc00;margin-bottom:40px}
+#gameOverScreen .final-score{font-size:30px;color:#ffcc00;text-shadow:0 0 20px #ffcc00;margin-bottom:10px}
+#gameOverScreen .stats-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px 30px;margin-bottom:30px;text-align:center}
+#gameOverScreen .stat-item{font-size:16px;color:#aaccee;text-shadow:0 0 8px #4466aa}
+#gameOverScreen .stat-value{font-size:22px;color:#00ffcc;text-shadow:0 0 12px #00ffcc;font-weight:bold}
+#gameOverScreen .stat-label{font-size:11px;color:#667788;text-transform:uppercase;letter-spacing:2px}
+#gameOverScreen .high-score{font-size:18px;color:#ff00ff;text-shadow:0 0 15px #ff00ff;margin-bottom:25px}
+#gameOverScreen .new-record{color:#ffcc00;animation:blink 0.5s ease-in-out infinite;font-size:20px;margin-bottom:5px}
 #gameOverScreen .start-btn{font-size:20px;color:#00ffff;text-shadow:0 0 15px #00ffff;cursor:pointer;background:none;border:2px solid #00ffff66;padding:12px 40px;font-family:inherit;letter-spacing:4px;transition:all .3s}
 #gameOverScreen .start-btn:hover{border-color:#00ffff;background:#00ffff11;box-shadow:0 0 30px #00ffff44}
 </style>
@@ -32,6 +38,14 @@ canvas{display:block}
 <div id="gameOverScreen">
   <h1>GAME OVER</h1>
   <div class="final-score" id="finalScore">SCORE: 0</div>
+  <div id="newRecordBanner" class="new-record" style="display:none">★ NEW RECORD! ★</div>
+  <div class="high-score" id="highScoreDisplay">BEST: 0</div>
+  <div class="stats-grid" id="statsGrid">
+    <div class="stat-item"><div class="stat-value" id="statWave">0</div><div class="stat-label">Wave</div></div>
+    <div class="stat-item"><div class="stat-value" id="statKills">0</div><div class="stat-label">Kills</div></div>
+    <div class="stat-item"><div class="stat-value" id="statCombo">0</div><div class="stat-label">Max Combo</div></div>
+    <div class="stat-item"><div class="stat-value" id="statTowers">0</div><div class="stat-label">Towers Built</div></div>
+  </div>
   <button class="start-btn" id="restartBtn">▶ PLAY AGAIN ◀</button>
 </div>
 
@@ -78,10 +92,11 @@ let unlockedTech = new Set();
 let techPoints = 0; // earned per wave
 
 const ENEMY_DEFS = {
-  drone:  { hp:40,   speed:2.2, reward:10, color:'#00ffcc', size:0.28, shape:'diamond' },
-  walker: { hp:100,  speed:1.2, reward:20, color:'#ff8800', size:0.35, shape:'square' },
-  heavy:  { hp:300,  speed:0.6, reward:50, color:'#ff2244', size:0.45, shape:'pentagon' },
-  boss:   { hp:1200, speed:0.35,reward:200,color:'#ffcc00', size:0.6,  shape:'octagon' }
+  drone:   { hp:40,   speed:2.2, reward:10, color:'#00ffcc', size:0.28, shape:'diamond' },
+  walker:  { hp:100,  speed:1.2, reward:20, color:'#ff8800', size:0.35, shape:'square' },
+  phantom: { hp:60,   speed:2.8, reward:30, color:'#8844ff', size:0.3,  shape:'triangle', stealth:true },
+  heavy:   { hp:300,  speed:0.6, reward:50, color:'#ff2244', size:0.45, shape:'pentagon' },
+  boss:    { hp:1200, speed:0.35,reward:200,color:'#ffcc00', size:0.6,  shape:'octagon' }
 };
 
 // ─── MUSIC DATA ──────────────────────────────────
@@ -126,6 +141,54 @@ let waveBanner = { text:'', alpha:0, timer:0 };
 let stars = [];
 let mountainPoints = [];
 let screenShake = { x:0, y:0, intensity:0 };
+
+// ─── GAME SPEED ──────────────────────────────────
+let gameSpeed = 1; // 1x, 2x, 3x
+const SPEED_OPTIONS = [1, 2, 3];
+let speedBtnBounds = null;
+
+// ─── COMBO SYSTEM ────────────────────────────────
+let comboCount = 0;
+let comboTimer = 0;
+const COMBO_TIMEOUT = 2.0; // seconds to maintain combo
+let maxCombo = 0;
+let totalKills = 0;
+let towersBuilt = 0;
+let creditsEarned = 0;
+
+// ─── FLOATING TEXT ───────────────────────────────
+let floatingTexts = [];
+
+function spawnFloatingText(x, y, text, color, size) {
+  floatingTexts.push({
+    x, y, text, color,
+    size: size || 14,
+    life: 1.2,
+    maxLife: 1.2,
+    vy: -40
+  });
+}
+
+// ─── HIGH SCORE ──────────────────────────────────
+let highScore = 0;
+let highWave = 0;
+try {
+  highScore = parseInt(localStorage.getItem('neonDefenseHighScore')) || 0;
+  highWave = parseInt(localStorage.getItem('neonDefenseHighWave')) || 0;
+} catch(e) {}
+
+function saveHighScore() {
+  try {
+    if (score > highScore) { highScore = score; localStorage.setItem('neonDefenseHighScore', score); }
+    if (wave > highWave) { highWave = wave; localStorage.setItem('neonDefenseHighWave', wave); }
+  } catch(e) {}
+}
+
+// ─── AUTO-WAVE ───────────────────────────────────
+let autoWave = false;
+let autoWaveTimer = 0;
+const AUTO_WAVE_DELAY = 3; // seconds after wave clear
+let autoWaveBtnBounds = null;
 
 // Camera system
 let camY = 0;        // 0 = game view (ground), 1 = sky view (tech tree)
@@ -680,7 +743,13 @@ function placeTower(col, row, type) {
   tower.range *= getTechRangeMultiplier();
   tower.rate *= getTechRateMultiplier();
   towers.set(key, tower);
+  towersBuilt++;
   playSfx('place');
+  spawnFloatingText(
+    gridX + (col + 0.5) * cellSize,
+    gridY + (row + 0.5) * cellSize - 20,
+    '-' + def.cost + '\u00A2', '#ff6644', 13
+  );
   spawnParticles(
     gridX + (col + 0.5) * cellSize,
     gridY + (row + 0.5) * cellSize,
@@ -694,6 +763,7 @@ function sellTower(key) {
   if (!t) return;
   const refund = Math.floor(TOWER_DEFS[t.type].cost * 0.5 * t.level);
   credits += refund;
+  spawnFloatingText(t.x, t.y - 15, '+' + refund + '\u00A2', '#ffcc00', 16);
   spawnParticles(t.x, t.y, '#ffcc00', 5, 50, 0.3);
   towers.delete(key);
   playSfx('sell');
@@ -719,7 +789,12 @@ function findTarget(tower) {
     if (e.dead) continue;
     const dx = e.x - tower.x, dy = e.y - tower.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    if (dist <= tower.range && e.pathProgress > bestProgress) {
+    // Stealth enemies have reduced detection range (except tesla & cryo reveal them)
+    let effectiveRange = tower.range;
+    if (e.stealth && tower.type !== 'tesla' && tower.type !== 'cryo') {
+      effectiveRange *= 0.6;
+    }
+    if (dist <= effectiveRange && e.pathProgress > bestProgress) {
       best = e;
       bestProgress = e.pathProgress;
     }
@@ -855,18 +930,42 @@ function createEnemy(type, hpMult) {
     slowTimer: 0,
     slowFactor: 1,
     spawnTime: 0,
-    trailTimer: 0
+    trailTimer: 0,
+    stealth: def.stealth || false
   };
 }
 
 function dealDamage(enemy, dmg) {
   if (enemy.dead) return;
   enemy.hp -= dmg;
+  // Floating damage number
+  if (dmg > 20) {
+    spawnFloatingText(enemy.x + (Math.random()-0.5)*10, enemy.y - 10, '-' + dmg, '#ff4444', 11);
+  }
   if (enemy.hp <= 0) {
     enemy.dead = true;
-    credits += enemy.reward;
-    score += enemy.reward * 2;
+    // Combo system
+    comboCount++;
+    comboTimer = COMBO_TIMEOUT;
+    if (comboCount > maxCombo) maxCombo = comboCount;
+    totalKills++;
+    // Combo bonus: extra credits for streaks
+    let comboBonus = 0;
+    if (comboCount >= 10) comboBonus = Math.floor(enemy.reward * 0.5);
+    else if (comboCount >= 5) comboBonus = Math.floor(enemy.reward * 0.25);
+    const totalReward = enemy.reward + comboBonus;
+    credits += totalReward;
+    creditsEarned += totalReward;
+    score += enemy.reward * 2 + comboBonus * 3;
     spawnExplosion(enemy.x, enemy.y, enemy.color, enemy.type === 'boss');
+    // Floating reward text
+    let rewardText = '+' + totalReward + '\u00A2';
+    if (comboBonus > 0) rewardText += ' (x' + comboCount + ')';
+    spawnFloatingText(enemy.x, enemy.y - 20, rewardText, '#ffcc00', comboCount >= 10 ? 18 : 14);
+    // Combo milestone announcements
+    if (comboCount === 10) spawnFloatingText(enemy.x, enemy.y - 40, '\u26A1 COMBO x10!', '#ff00ff', 20);
+    else if (comboCount === 25) spawnFloatingText(enemy.x, enemy.y - 40, '\u{1F525} MEGA COMBO x25!', '#ff6600', 22);
+    else if (comboCount === 50) spawnFloatingText(enemy.x, enemy.y - 40, '\u2B50 ULTRA COMBO x50!', '#ffcc00', 26);
     // Find tower that killed it for kill counter
     for (const [, t] of towers) {
       const d = Math.hypot(t.x - enemy.x, t.y - enemy.y);
@@ -881,6 +980,7 @@ function generateWave(num) {
   const hpMult = 1 + (num - 1) * 0.18;
   const droneCount = Math.floor(4 + num * 1.8);
   const walkerCount = num >= 3 ? Math.floor(1 + (num - 2) * 1.2) : 0;
+  const phantomCount = num >= 4 ? Math.floor((num - 3) * 0.7) : 0;
   const heavyCount = num >= 6 ? Math.floor((num - 5) * 0.6) : 0;
   const hasBoss = num > 0 && num % 5 === 0;
   let t = 0;
@@ -889,6 +989,11 @@ function generateWave(num) {
     t += 0.7 - Math.min(0.3, num * 0.02);
   }
   t += 0.5;
+  for (let i = 0; i < phantomCount; i++) {
+    w.push({ type: 'phantom', time: t, hpMult });
+    t += 0.6;
+  }
+  t += 0.3;
   for (let i = 0; i < walkerCount; i++) {
     w.push({ type: 'walker', time: t, hpMult });
     t += 1.1;
@@ -903,6 +1008,21 @@ function generateWave(num) {
     w.push({ type: 'boss', time: t, hpMult: hpMult * 1.5 });
   }
   return w;
+}
+
+function getWavePreview(num) {
+  const hpMult = 1 + (num - 1) * 0.18;
+  const preview = {};
+  const droneCount = Math.floor(4 + num * 1.8);
+  if (droneCount > 0) preview.drone = droneCount;
+  const phantomCount = num >= 4 ? Math.floor((num - 3) * 0.7) : 0;
+  if (phantomCount > 0) preview.phantom = phantomCount;
+  const walkerCount = num >= 3 ? Math.floor(1 + (num - 2) * 1.2) : 0;
+  if (walkerCount > 0) preview.walker = walkerCount;
+  const heavyCount = num >= 6 ? Math.floor((num - 5) * 0.6) : 0;
+  if (heavyCount > 0) preview.heavy = heavyCount;
+  if (num > 0 && num % 5 === 0) preview.boss = 1;
+  return preview;
 }
 
 function startWave() {
@@ -988,7 +1108,18 @@ function update(dt) {
       spawnParticles(e.x, e.y, '#ff0044', 8, 80, 0.3);
       if (lives <= 0) {
         gamePhase = 'gameover';
-        document.getElementById('finalScore').textContent = 'SCORE: ' + score + '  |  WAVE: ' + wave;
+        saveHighScore();
+        document.getElementById('finalScore').textContent = 'SCORE: ' + score;
+        document.getElementById('statWave').textContent = wave;
+        document.getElementById('statKills').textContent = totalKills;
+        document.getElementById('statCombo').textContent = maxCombo;
+        document.getElementById('statTowers').textContent = towersBuilt;
+        document.getElementById('highScoreDisplay').textContent = 'BEST: ' + highScore + '  |  WAVE: ' + highWave;
+        if (score >= highScore) {
+          document.getElementById('newRecordBanner').style.display = 'block';
+        } else {
+          document.getElementById('newRecordBanner').style.display = 'none';
+        }
         document.getElementById('gameOverScreen').style.display = 'flex';
       }
     }
@@ -1066,6 +1197,13 @@ function update(dt) {
     fd.progress += fd.speed * dt;
     if (fd.progress >= fullPath.length) fd.progress -= fullPath.length;
   }
+
+  // Floating texts
+  for (const ft of floatingTexts) {
+    ft.y += ft.vy * dt;
+    ft.life -= dt;
+  }
+  floatingTexts = floatingTexts.filter(ft => ft.life > 0);
 
   // Ambient particles
   for (const ap of ambientParticles) {
@@ -1237,6 +1375,20 @@ function render() {
     ctx.fillRect(p.x - p.size * alpha * 0.5, p.y - p.size * alpha * 0.5, p.size * alpha, p.size * alpha);
   }
   ctx.globalAlpha = 1;
+
+  // === FLOATING TEXTS ===
+  for (const ft of floatingTexts) {
+    const alpha = ft.life / ft.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.font = 'bold ' + ft.size + 'px monospace';
+    ctx.fillStyle = ft.color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(ft.text, ft.x, ft.y);
+  }
+  ctx.globalAlpha = 1;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'top';
 
   } // end if (camYSmooth < 0.98)
 
@@ -2214,6 +2366,25 @@ function drawEnemy(e) {
     ctx.rotate(Math.PI / 4 + gameTime * 3);
     ctx.fillRect(-size, -size, size * 2, size * 2);
     ctx.strokeRect(-size, -size, size * 2, size * 2);
+  } else if (e.shape === 'triangle') {
+    // Phantom — stealth shimmer
+    const stealthAlpha = 0.35 + Math.sin(gameTime * 6 + e.id) * 0.2;
+    ctx.globalAlpha = stealthAlpha;
+    ctx.rotate(gameTime * 4);
+    ctx.beginPath();
+    for (let i = 0; i < 3; i++) {
+      const a = Math.PI * 2 / 3 * i - Math.PI / 2;
+      ctx.lineTo(Math.cos(a) * size * 1.2, Math.sin(a) * size * 1.2);
+    }
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+    // Inner glow
+    ctx.fillStyle = '#ffffff22';
+    ctx.beginPath();
+    ctx.arc(0, 0, size * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.globalAlpha = 1;
   } else if (e.shape === 'square') {
     ctx.rotate(gameTime * 0.5);
     ctx.fillRect(-size, -size, size * 2, size * 2);
@@ -2369,6 +2540,43 @@ function drawHUD() {
   ctx.fillStyle = '#00ffff';
   ctx.fillText('WAVE ' + wave, W - 20, 15);
 
+  // Speed control button
+  const speedBtnW = 50, speedBtnH = 22;
+  const speedBtnX = W - 75, speedBtnY = 38;
+  ctx.fillStyle = gameSpeed > 1 ? 'rgba(255,200,0,0.15)' : 'rgba(0,255,255,0.08)';
+  ctx.strokeStyle = gameSpeed > 1 ? '#ffcc0088' : '#00ffff44';
+  ctx.lineWidth = 1;
+  ctx.fillRect(speedBtnX, speedBtnY, speedBtnW, speedBtnH);
+  ctx.strokeRect(speedBtnX, speedBtnY, speedBtnW, speedBtnH);
+  ctx.font = 'bold 13px monospace';
+  ctx.fillStyle = gameSpeed > 1 ? '#ffcc00' : '#00ffff';
+  ctx.textAlign = 'center';
+  ctx.fillText('\u25B6'.repeat(gameSpeed) + ' ' + gameSpeed + 'x', speedBtnX + speedBtnW / 2, speedBtnY + speedBtnH / 2 + 1);
+  ctx.textBaseline = 'top';
+  speedBtnBounds = { x: speedBtnX, y: speedBtnY, w: speedBtnW, h: speedBtnH };
+
+  // Auto-wave toggle button
+  const awBtnW = 50, awBtnH = 22;
+  const awBtnX = W - 75, awBtnY = 64;
+  ctx.fillStyle = autoWave ? 'rgba(0,255,136,0.15)' : 'rgba(60,30,80,0.3)';
+  ctx.strokeStyle = autoWave ? '#00ff8844' : '#44335544';
+  ctx.lineWidth = 1;
+  ctx.fillRect(awBtnX, awBtnY, awBtnW, awBtnH);
+  ctx.strokeRect(awBtnX, awBtnY, awBtnW, awBtnH);
+  ctx.font = 'bold 11px monospace';
+  ctx.fillStyle = autoWave ? '#00ff88' : '#555566';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('AUTO', awBtnX + awBtnW / 2, awBtnY + awBtnH / 2);
+  ctx.textBaseline = 'top';
+  autoWaveBtnBounds = { x: awBtnX, y: awBtnY, w: awBtnW, h: awBtnH };
+
+  // High score (small, top right)
+  ctx.textAlign = 'right';
+  ctx.font = '11px monospace';
+  ctx.fillStyle = '#666688';
+  ctx.fillText('HI: ' + highScore, W - 20, 90);
+
   // Enemies remaining
   if (waveActive) {
     ctx.font = '13px "Segoe UI", monospace';
@@ -2379,9 +2587,9 @@ function drawHUD() {
 
   // Next wave / start wave button
   if (!waveActive && gamePhase === 'playing') {
-    const btnX = W / 2 - 80;
-    const btnY = gridY - 35;
-    const btnW = 160, btnH = 28;
+    const btnX = W / 2 - 100;
+    const btnY = gridY - 55;
+    const btnW = 200, btnH = 28;
     // Background
     ctx.fillStyle = 'rgba(0,255,255,0.08)';
     ctx.strokeStyle = '#00ffff88';
@@ -2395,8 +2603,27 @@ function drawHUD() {
     ctx.fillStyle = '#00ffff';
     const pulse = 0.7 + Math.sin(gameTime * 4) * 0.3;
     ctx.globalAlpha = pulse;
-    ctx.fillText('▶ NEXT WAVE (' + (wave + 1) + ')', W / 2, btnY + btnH / 2);
+    ctx.fillText('\u25b6 NEXT WAVE (' + (wave + 1) + ')' + (autoWave ? '  [AUTO ' + Math.ceil(autoWaveTimer) + 's]' : ''), W / 2, btnY + btnH / 2);
     ctx.globalAlpha = 1;
+    // Wave preview
+    const preview = getWavePreview(wave + 1);
+    ctx.font = '11px monospace';
+    ctx.textBaseline = 'top';
+    let previewX = btnX;
+    const previewY = btnY + btnH + 4;
+    const previewParts = [];
+    for (const [type, count] of Object.entries(preview)) {
+      previewParts.push({ type, count, color: ENEMY_DEFS[type].color });
+    }
+    const previewTotalW = previewParts.reduce((s, p) => s + (p.type.length + String(p.count).length + 3) * 7, 0);
+    let px = W / 2 - previewTotalW / 2;
+    for (const p of previewParts) {
+      ctx.fillStyle = p.color;
+      ctx.textAlign = 'left';
+      const label = p.count + 'x ' + p.type.toUpperCase();
+      ctx.fillText(label, px, previewY);
+      px += (label.length + 2) * 7;
+    }
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
     // Store button bounds for click handling
@@ -2412,9 +2639,9 @@ function drawHUD() {
   ctx.fillStyle = '#666688';
   ctx.globalAlpha = 0.7;
   if (isMobile) {
-    ctx.fillText('TAP — place / select tower  |  SWIPE ↕ — camera  |  ⚡ button — tech tree', W / 2, 4);
+    ctx.fillText('TAP — place/select  |  SWIPE ↕ — camera  |  ⚡ tech tree', W / 2, 4);
   } else {
-    ctx.fillText('LMB — place / click tower  |  RMB — sell  |  1-8 — towers  |  SPACE — wave  |  TAB — tech tree', W / 2, 4);
+    ctx.fillText('1-8 towers  |  SPACE wave  |  TAB tech  |  +/- speed  |  A auto-wave  |  RMB sell', W / 2, 4);
   }
   ctx.globalAlpha = 1;
   ctx.textAlign = 'left';
@@ -2737,6 +2964,25 @@ canvas.addEventListener('click', e => {
   if (gamePhase !== 'playing') return;
   const mx = e.clientX, my = e.clientY;
 
+  // Check speed button
+  if (speedBtnBounds) {
+    const b = speedBtnBounds;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      const idx = SPEED_OPTIONS.indexOf(gameSpeed);
+      gameSpeed = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+      return;
+    }
+  }
+
+  // Check auto-wave button
+  if (autoWaveBtnBounds) {
+    const b = autoWaveBtnBounds;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      autoWave = !autoWave;
+      return;
+    }
+  }
+
   // Check mobile camera toggle button
   if (mobileCamBtn) {
     const b = mobileCamBtn;
@@ -2865,6 +3111,19 @@ document.addEventListener('keydown', e => {
     e.preventDefault();
     if (!waveActive) startWave();
   }
+  // Speed control
+  if (e.key === '+' || e.key === '=') {
+    const idx = SPEED_OPTIONS.indexOf(gameSpeed);
+    gameSpeed = SPEED_OPTIONS[Math.min(idx + 1, SPEED_OPTIONS.length - 1)];
+  }
+  if (e.key === '-') {
+    const idx = SPEED_OPTIONS.indexOf(gameSpeed);
+    gameSpeed = SPEED_OPTIONS[Math.max(idx - 1, 0)];
+  }
+  // Auto-wave toggle
+  if (e.key === 'a' || e.key === 'A') {
+    autoWave = !autoWave;
+  }
 });
 
 // ─── GAME LOOP ───────────────────────────────────
@@ -2875,7 +3134,8 @@ function gameLoop(timestamp) {
   if (dt > 0.1) dt = 0.1; // cap delta time
 
   if (gamePhase === 'playing') {
-    update(dt);
+    const adjustedDt = dt * gameSpeed;
+    update(adjustedDt);
     // Smooth camera
     camYSmooth += (camYTarget - camYSmooth) * Math.min(1, CAM_SPEED * dt);
     if (Math.abs(camYSmooth - camYTarget) < 0.002) camYSmooth = camYTarget;
@@ -2910,6 +3170,15 @@ function initGame() {
   camY = 0; camYTarget = 0; camYSmooth = 0;
   techPoints = 0;
   unlockedTech = new Set();
+  gameSpeed = 1;
+  comboCount = 0;
+  comboTimer = 0;
+  maxCombo = 0;
+  totalKills = 0;
+  towersBuilt = 0;
+  creditsEarned = 0;
+  floatingTexts = [];
+  autoWaveTimer = 0;
   // Reset tower locks
   for (const key of Object.keys(TOWER_DEFS)) {
     TOWER_DEFS[key].locked = ['flame','sniper','pulse','void'].includes(key);
@@ -3007,6 +3276,25 @@ canvas.addEventListener('touchend', e => {
 
   // Simulate click — reuse click logic
   const mx = pos.x, my = pos.y;
+
+  // Check speed button
+  if (speedBtnBounds) {
+    const b = speedBtnBounds;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      const idx = SPEED_OPTIONS.indexOf(gameSpeed);
+      gameSpeed = SPEED_OPTIONS[(idx + 1) % SPEED_OPTIONS.length];
+      return;
+    }
+  }
+
+  // Check auto-wave button
+  if (autoWaveBtnBounds) {
+    const b = autoWaveBtnBounds;
+    if (mx >= b.x && mx <= b.x + b.w && my >= b.y && my <= b.y + b.h) {
+      autoWave = !autoWave;
+      return;
+    }
+  }
 
   // Check mobile camera toggle button
   if (mobileCamBtn) {
