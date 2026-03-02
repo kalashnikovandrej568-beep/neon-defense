@@ -789,9 +789,9 @@ function findTarget(tower) {
     if (e.dead) continue;
     const dx = e.x - tower.x, dy = e.y - tower.y;
     const dist = Math.sqrt(dx * dx + dy * dy);
-    // Stealth enemies have reduced detection range (except tesla & cryo reveal them)
+    // Stealth enemies have reduced detection range (except tesla & cryo reveal them, or STEALTH SCAN tech)
     let effectiveRange = tower.range;
-    if (e.stealth && tower.type !== 'tesla' && tower.type !== 'cryo') {
+    if (e.stealth && tower.type !== 'tesla' && tower.type !== 'cryo' && !unlockedTech.has('reveal')) {
       effectiveRange *= 0.6;
     }
     if (dist <= effectiveRange && e.pathProgress > bestProgress) {
@@ -816,7 +816,20 @@ function towerShoot(tower, target, dt) {
       x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
       color: tower.color, life: 0.1, maxLife: 0.1, width: 2 + tower.level
     });
-    dealDamage(target, tower.dmg);
+    dealDamage(target, tower.dmg, 'laser');
+    // Multishot tech: hit 1 extra target
+    if (unlockedTech.has('multi')) {
+      let extra = null, extraDist = tower.range;
+      for (const e of enemies) {
+        if (e.dead || e.id === target.id) continue;
+        const d = Math.hypot(e.x - tower.x, e.y - tower.y);
+        if (d < extraDist) { extra = e; extraDist = d; }
+      }
+      if (extra) {
+        beams.push({ x1: tower.x, y1: tower.y, x2: extra.x, y2: extra.y, color: tower.color + '88', life: 0.08, maxLife: 0.08, width: 1 + tower.level });
+        dealDamage(extra, Math.floor(tower.dmg * 0.5), 'laser');
+      }
+    }
   } else if (tower.type === 'plasma') {
     projectiles.push({
       x: tower.x, y: tower.y,
@@ -830,7 +843,7 @@ function towerShoot(tower, target, dt) {
       trail: []
     });
   } else if (tower.type === 'tesla') {
-    dealDamage(target, tower.dmg);
+    dealDamage(target, tower.dmg, 'tesla');
     beams.push({
       x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
       color: tower.color, life: 0.12, maxLife: 0.12, width: 2, tesla: true
@@ -848,7 +861,7 @@ function towerShoot(tower, target, dt) {
       }
       if (!closest) break;
       hit.add(closest.id);
-      dealDamage(closest, Math.floor(tower.dmg * 0.6));
+      dealDamage(closest, Math.floor(tower.dmg * 0.6), 'tesla');
       beams.push({
         x1: lastX, y1: lastY, x2: closest.x, y2: closest.y,
         color: '#cc88ff', life: 0.1, maxLife: 0.1, width: 1.5, tesla: true
@@ -860,7 +873,7 @@ function towerShoot(tower, target, dt) {
       x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
       color: tower.color, life: 0.08, maxLife: 0.08, width: 3 + tower.level, cryo: true
     });
-    dealDamage(target, tower.dmg);
+    dealDamage(target, tower.dmg, 'cryo');
     target.slowTimer = 2;
     target.slowFactor = 0.4;
     spawnParticles(target.x, target.y, '#88ccff', 3, 30, 0.3);
@@ -870,7 +883,7 @@ function towerShoot(tower, target, dt) {
       if (e.dead) continue;
       const d = Math.hypot(e.x - tower.x, e.y - tower.y);
       if (d <= tower.range) {
-        dealDamage(e, tower.dmg);
+        dealDamage(e, tower.dmg, 'flame');
         spawnParticles(e.x, e.y, '#ff6600', 2, 40, 0.2);
       }
     }
@@ -882,19 +895,32 @@ function towerShoot(tower, target, dt) {
     spawnParticles(tower.x, tower.y, '#ffaa00', 4, 60, 0.3);
   } else if (tower.type === 'sniper') {
     // High damage single target
-    dealDamage(target, tower.dmg);
+    dealDamage(target, tower.dmg, 'sniper');
     beams.push({
       x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
       color: '#88ff44', life: 0.15, maxLife: 0.15, width: 1.5
     });
     spawnParticles(target.x, target.y, '#88ff44', 5, 70, 0.3);
+    // Multishot tech: hit 1 extra target
+    if (unlockedTech.has('multi')) {
+      let extra = null, extraDist = tower.range;
+      for (const e of enemies) {
+        if (e.dead || e.id === target.id) continue;
+        const d = Math.hypot(e.x - tower.x, e.y - tower.y);
+        if (d < extraDist) { extra = e; extraDist = d; }
+      }
+      if (extra) {
+        beams.push({ x1: tower.x, y1: tower.y, x2: extra.x, y2: extra.y, color: '#88ff4488', life: 0.12, maxLife: 0.12, width: 1 });
+        dealDamage(extra, Math.floor(tower.dmg * 0.5), 'sniper');
+      }
+    }
   } else if (tower.type === 'pulse') {
     // Push back + damage all in range
     for (const e of enemies) {
       if (e.dead) continue;
       const d = Math.hypot(e.x - tower.x, e.y - tower.y);
       if (d <= tower.range) {
-        dealDamage(e, tower.dmg);
+        dealDamage(e, tower.dmg, 'pulse');
         // Push enemy back along path
         e.pathProgress = Math.max(0, e.pathProgress - 0.03 * (1 + tower.level * 0.3));
         spawnParticles(e.x, e.y, '#ff44aa', 2, 50, 0.25);
@@ -904,7 +930,7 @@ function towerShoot(tower, target, dt) {
   } else if (tower.type === 'void') {
     // % HP damage
     const pctDmg = Math.max(tower.dmg, Math.floor(target.maxHp * (0.04 + tower.level * 0.02)));
-    dealDamage(target, pctDmg);
+    dealDamage(target, pctDmg, 'void');
     beams.push({
       x1: tower.x, y1: tower.y, x2: target.x, y2: target.y,
       color: '#aa00ff', life: 0.2, maxLife: 0.2, width: 3, tesla: true
@@ -931,16 +957,31 @@ function createEnemy(type, hpMult) {
     slowFactor: 1,
     spawnTime: 0,
     trailTimer: 0,
-    stealth: def.stealth || false
+    stealth: def.stealth || false,
+    burnTimer: 0,
+    burnDmg: 0
   };
 }
 
-function dealDamage(enemy, dmg) {
+function dealDamage(enemy, dmg, towerType) {
   if (enemy.dead) return;
-  enemy.hp -= dmg;
+  // Crit chance from tech
+  let finalDmg = dmg;
+  let isCrit = false;
+  if (unlockedTech.has('crit') && Math.random() < 0.15) {
+    finalDmg = Math.floor(dmg * 2);
+    isCrit = true;
+  }
+  enemy.hp -= finalDmg;
+  // Burn DOT from tech (flame & pulse)
+  if (unlockedTech.has('burn') && (towerType === 'flame' || towerType === 'pulse')) {
+    enemy.burnTimer = 3; // 3 seconds of DOT
+    enemy.burnDmg = Math.max(2, Math.floor(dmg * 0.15)); // 15% dmg per tick
+  }
   // Floating damage number
-  if (dmg > 20) {
-    spawnFloatingText(enemy.x + (Math.random()-0.5)*10, enemy.y - 10, '-' + dmg, '#ff4444', 11);
+  if (finalDmg > 20 || isCrit) {
+    const critText = isCrit ? '!' : '';
+    spawnFloatingText(enemy.x + (Math.random()-0.5)*10, enemy.y - 10, '-' + finalDmg + critText, isCrit ? '#ff00ff' : '#ff4444', isCrit ? 16 : 11);
   }
   if (enemy.hp <= 0) {
     enemy.dead = true;
@@ -953,7 +994,8 @@ function dealDamage(enemy, dmg) {
     let comboBonus = 0;
     if (comboCount >= 10) comboBonus = Math.floor(enemy.reward * 0.5);
     else if (comboCount >= 5) comboBonus = Math.floor(enemy.reward * 0.25);
-    const totalReward = enemy.reward + comboBonus;
+    const baseReward = Math.floor(enemy.reward * getTechRewardMultiplier());
+    const totalReward = baseReward + comboBonus;
     credits += totalReward;
     creditsEarned += totalReward;
     score += enemy.reward * 2 + comboBonus * 3;
@@ -1067,11 +1109,19 @@ function update(dt) {
     waveActive = false;
     const bonus = 20 + wave * 5;
     credits += bonus;
+    creditsEarned += bonus;
     score += bonus * 3;
     // Award tech points
     const tp = 10 + wave * 5;
     techPoints += tp;
-    waveBanner = { text: 'WAVE ' + wave + ' CLEARED! +' + bonus + '¢  ⚡+' + tp + 'tp', alpha: 1, timer: 2.5 };
+    // Regen tech: +1 life every 3 waves
+    let regenMsg = '';
+    if (unlockedTech.has('regen') && wave % 3 === 0) {
+      lives = Math.min(lives + 1, 20);
+      regenMsg = '  ❤+1';
+      spawnFloatingText(COLS * CELL / 2, ROWS * CELL / 2, '+1 ❤', '#66aaff', 20);
+    }
+    waveBanner = { text: 'WAVE ' + wave + ' CLEARED! +' + bonus + '¢  ⚡+' + tp + 'tp' + regenMsg, alpha: 1, timer: 2.5 };
   }
 
   // Update enemies
@@ -1083,6 +1133,25 @@ function update(dt) {
       e.speed = e.baseSpeed * e.slowFactor;
     } else {
       e.speed = e.baseSpeed;
+    }
+    // Burn DOT tick
+    if (e.burnTimer > 0) {
+      e.burnTimer -= dt;
+      if (Math.random() < dt * 3) { // ~3 ticks per second
+        e.hp -= e.burnDmg;
+        spawnParticles(e.x, e.y, '#ff4400', 1, 20, 0.15);
+        if (e.hp <= 0 && !e.dead) {
+          e.dead = true;
+          comboCount++; comboTimer = COMBO_TIMEOUT;
+          if (comboCount > maxCombo) maxCombo = comboCount;
+          totalKills++;
+          const reward = Math.floor(e.reward * getTechRewardMultiplier());
+          credits += reward; creditsEarned += reward;
+          score += reward * 2;
+          spawnExplosion(e.x, e.y, e.color, false);
+          spawnFloatingText(e.x, e.y - 15, '+' + reward + '\\u00A2', '#ffcc00', 13);
+        }
+      }
     }
     e.pathProgress += e.speed * dt;
     const pos = getPathPosition(e.pathProgress);
@@ -1156,7 +1225,7 @@ function update(dt) {
       if (p.splash) {
         for (const e of enemies) {
           if (!e.dead && Math.hypot(e.x - tx, e.y - ty) < p.splash) {
-            dealDamage(e, p.dmg);
+            dealDamage(e, p.dmg, 'plasma');
           }
         }
         spawnExplosion(tx, ty, p.color, false);
@@ -1564,13 +1633,14 @@ function drawSkyView(W, H) {
 
   // Draw tech tree nodes — responsive
   techTreeBtns = [];
-  const nodeW = Math.min(170, W * 0.2);
-  const nodeH = nodeW < 120 ? 60 : 80;
-  const gapX = nodeW + (nodeW < 120 ? 10 : 30);
-  const gapY = nodeH + (nodeW < 120 ? 15 : 30);
-  const treeW = 4 * gapX - (gapX - nodeW);
+  const nodeW = Math.min(150, W * 0.17);
+  const nodeH = nodeW < 100 ? 55 : 72;
+  const gapX = nodeW + (nodeW < 100 ? 8 : 18);
+  const gapY = nodeH + (nodeW < 100 ? 12 : 25);
+  const treeCols = 5;
+  const treeW = treeCols * gapX - (gapX - nodeW);
   const treeBaseX = (W - treeW) / 2;
-  const treeBaseY = H * 0.34;
+  const treeBaseY = H * 0.32;
 
   // Draw connections first
   ctx.strokeStyle = '#333355';
@@ -1630,49 +1700,59 @@ function drawSkyView(W, H) {
 
     // Icon (tower shape or star)
     ctx.globalAlpha = isLocked ? 0.25 : 1;
-    const iconOff = nodeW < 120 ? 20 : 30;
-    const textOff = nodeW < 120 ? 38 : 55;
-    const iconSz = nodeW < 120 ? 12 : 18;
+    const iconOff = nodeW < 100 ? 18 : 26;
+    const textOff = nodeW < 100 ? 34 : 48;
+    const iconSz = nodeW < 100 ? 10 : 15;
     if (tech.unlocks) {
       drawTowerShape(nx + iconOff, ny + nodeH / 2, tech.unlocks, tech.color, iconSz, gameTime * (isUnlocked ? 1 : 0.3), 1);
     } else {
-      // Stat upgrade icon
+      // Stat upgrade icon — different per type
       ctx.fillStyle = tech.color;
-      ctx.font = (nodeW < 120 ? '16' : '24') + 'px monospace';
+      ctx.font = (nodeW < 100 ? '14' : '20') + 'px monospace';
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      ctx.fillText('\u2B06', nx + iconOff, ny + nodeH / 2);
+      const icon = tech.id.startsWith('dmg') ? '\u2694' :
+                   tech.id.startsWith('range') ? '\u25CE' :
+                   tech.id.startsWith('rate') ? '\u26A1' :
+                   tech.id.startsWith('econ') ? '\u2B50' :
+                   tech.id === 'reveal' ? '\u{1F441}' :
+                   tech.id === 'burn' ? '\u{1F525}' :
+                   tech.id === 'crit' ? '\u2620' :
+                   tech.id === 'multi' ? '\u2726' :
+                   tech.id === 'regen' ? '\u2764' : '\u2B06';
+      ctx.fillText(icon, nx + iconOff, ny + nodeH / 2);
     }
     ctx.globalAlpha = 1;
 
     // Name
-    ctx.font = 'bold ' + (nodeW < 120 ? '10' : '14') + 'px monospace';
+    ctx.font = 'bold ' + (nodeW < 100 ? '9' : '12') + 'px monospace';
     ctx.fillStyle = isLocked ? '#444455' : tech.color;
     ctx.textAlign = 'left';
     ctx.textBaseline = 'top';
-    ctx.fillText(tech.name, nx + textOff, ny + (nodeW < 120 ? 5 : 10));
+    ctx.fillText(tech.name, nx + textOff, ny + (nodeW < 100 ? 4 : 8));
 
     // Cost or UNLOCKED
-    ctx.font = (nodeW < 120 ? '9' : '12') + 'px monospace';
+    ctx.font = (nodeW < 100 ? '8' : '11') + 'px monospace';
     if (isUnlocked) {
       ctx.fillStyle = '#00ff88';
-      ctx.fillText('\u2713 UNLOCKED', nx + textOff, ny + (nodeW < 120 ? 20 : 30));
+      ctx.fillText('\u2713 UNLOCKED', nx + textOff, ny + (nodeW < 100 ? 16 : 24));
     } else {
       ctx.fillStyle = canUnlock ? '#ffcc00' : '#444455';
-      ctx.fillText('\u26A1 ' + tech.cost + ' pts', nx + textOff, ny + (nodeW < 120 ? 20 : 30));
+      ctx.fillText('\u26A1 ' + tech.cost + ' pts', nx + textOff, ny + (nodeW < 100 ? 16 : 24));
     }
 
-    // Description (hide on very small nodes)
-    if (nodeW >= 120) {
-      ctx.font = '11px monospace';
+    // Description
+    if (nodeW >= 100) {
+      ctx.font = '10px monospace';
       ctx.fillStyle = isLocked ? '#333344' : '#888899';
-      ctx.fillText(tech.desc.substring(0, 26), nx + textOff, ny + 50);
-      if (tech.desc.length > 26) ctx.fillText(tech.desc.substring(26), nx + textOff, ny + 64);
+      const maxChars = Math.floor((nodeW - textOff - 4) / 6);
+      ctx.fillText(tech.desc.substring(0, maxChars), nx + textOff, ny + 40);
+      if (tech.desc.length > maxChars) ctx.fillText(tech.desc.substring(maxChars, maxChars * 2), nx + textOff, ny + 53);
     } else {
-      ctx.font = '8px monospace';
+      ctx.font = '7px monospace';
       ctx.fillStyle = isLocked ? '#333344' : '#888899';
-      const maxChars = Math.floor((nodeW - textOff - 4) / 4.5);
-      ctx.fillText(tech.desc.substring(0, maxChars), nx + textOff, ny + 35);
+      const maxChars = Math.floor((nodeW - textOff - 4) / 4);
+      ctx.fillText(tech.desc.substring(0, maxChars), nx + textOff, ny + 30);
     }
   }
 
@@ -2779,12 +2859,15 @@ function unlockTech(tech) {
   if (tech.unlocks && TOWER_DEFS[tech.unlocks]) {
     TOWER_DEFS[tech.unlocks].locked = false;
   }
-  // Apply stat bonuses
+  // Apply stat bonuses to existing towers
   if (tech.id === 'dmg1') {
-    for (const [,t] of towers) { t.dmg *= 1.2; }
+    for (const [,t] of towers) { t.dmg = Math.floor(t.dmg * 1.2); }
   }
   if (tech.id === 'dmg2') {
-    for (const [,t] of towers) { t.dmg *= 1.3; }
+    for (const [,t] of towers) { t.dmg = Math.floor(t.dmg * 1.3); }
+  }
+  if (tech.id === 'dmg3') {
+    for (const [,t] of towers) { t.dmg = Math.floor(t.dmg * 1.5); }
   }
   if (tech.id === 'range1') {
     for (const [,t] of towers) { t.range *= 1.15; }
@@ -2792,6 +2875,8 @@ function unlockTech(tech) {
   if (tech.id === 'rate1') {
     for (const [,t] of towers) { t.rate *= 0.8; }
   }
+  // Floating text feedback
+  spawnFloatingText(logicalW / 2, logicalH * 0.5, '\u2713 ' + tech.name, tech.color, 22);
   playSfx('place');
   screenShake = { x: 0, y: 0, intensity: 8 };
 }
@@ -2800,6 +2885,7 @@ function getTechDmgMultiplier() {
   let m = 1;
   if (unlockedTech.has('dmg1')) m *= 1.2;
   if (unlockedTech.has('dmg2')) m *= 1.3;
+  if (unlockedTech.has('dmg3')) m *= 1.5;
   return m;
 }
 function getTechRangeMultiplier() {
@@ -2810,6 +2896,11 @@ function getTechRangeMultiplier() {
 function getTechRateMultiplier() {
   let m = 1;
   if (unlockedTech.has('rate1')) m *= 0.8; // lower = faster
+  return m;
+}
+function getTechRewardMultiplier() {
+  let m = 1;
+  if (unlockedTech.has('econ1')) m *= 1.25;
   return m;
 }
 
