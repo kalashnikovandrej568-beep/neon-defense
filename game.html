@@ -2670,7 +2670,34 @@ function drawPath() {
   // Build smooth center-line points
   const pts = fullPath.map(([c,r]) => cellToWorld(c,r));
 
-  // Draw road fill  — dark translucent
+  // Helper: draw a smoothed polyline through pts using rounded corners
+  const smoothRadius = cellSize * 0.4; // rounding radius at corners
+  function traceSmoothPath() {
+    if (pts.length < 2) return;
+    ctx.moveTo(pts[0].x, pts[0].y);
+    for (let i = 1; i < pts.length - 1; i++) {
+      const prev = pts[i - 1];
+      const cur  = pts[i];
+      const next = pts[i + 1];
+      // Vectors from cur to prev and cur to next
+      const dx1 = prev.x - cur.x, dy1 = prev.y - cur.y;
+      const dx2 = next.x - cur.x, dy2 = next.y - cur.y;
+      const len1 = Math.hypot(dx1, dy1) || 1;
+      const len2 = Math.hypot(dx2, dy2) || 1;
+      // Clamp radius so it doesn't exceed half the segment length
+      const r = Math.min(smoothRadius, len1 / 2, len2 / 2);
+      // Points where the arc starts and ends
+      const startX = cur.x + (dx1 / len1) * r;
+      const startY = cur.y + (dy1 / len1) * r;
+      const endX   = cur.x + (dx2 / len2) * r;
+      const endY   = cur.y + (dy2 / len2) * r;
+      ctx.lineTo(startX, startY);
+      ctx.quadraticCurveTo(cur.x, cur.y, endX, endY);
+    }
+    ctx.lineTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+  }
+
+  // Draw road fill
   ctx.save();
   ctx.lineJoin = 'round';
   ctx.lineCap = 'round';
@@ -2679,8 +2706,9 @@ function drawPath() {
   ctx.lineWidth = pw + 10;
   ctx.strokeStyle = 'rgba(0,255,255,0.04)';
   ctx.beginPath();
-  pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  traceSmoothPath();
   ctx.stroke();
+
   // Main road body
   ctx.lineWidth = pw;
   const roadGrad = ctx.createLinearGradient(gridX, gridY, gridX+gridW, gridY+gridH);
@@ -2689,13 +2717,14 @@ function drawPath() {
   roadGrad.addColorStop(1, 'rgba(10,0,30,0.85)');
   ctx.strokeStyle = roadGrad;
   ctx.beginPath();
-  pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  traceSmoothPath();
   ctx.stroke();
 
   // Neon edge lines (single combined pass)
   ctx.lineWidth = 1.5;
   ctx.strokeStyle = 'rgba(255,0,255,0.5)';
   const edgeOff = pw / 2 - 1;
+  // For edge lines, build offset points along the smooth path segments
   for (let side = -1; side <= 1; side += 2) {
     ctx.beginPath();
     for (let i = 0; i < pts.length - 1; i++) {
@@ -2709,6 +2738,7 @@ function drawPath() {
     }
     ctx.stroke();
   }
+
   // Center dashed line (animated)
   ctx.lineWidth = 1;
   ctx.strokeStyle = 'rgba(0,255,255,0.2)';
@@ -2716,20 +2746,18 @@ function drawPath() {
   ctx.setLineDash([6, 8]);
   ctx.lineDashOffset = -dashOffset;
   ctx.beginPath();
-  pts.forEach((p,i) => i===0 ? ctx.moveTo(p.x,p.y) : ctx.lineTo(p.x,p.y));
+  traceSmoothPath();
   ctx.stroke();
   ctx.setLineDash([]);
 
   // Entrance & exit markers
   const entry = pts[0];
   const exit = pts[pts.length - 1];
-  // Entry arrow
   ctx.fillStyle = '#00ff88';
   ctx.font = 'bold 18px monospace';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   ctx.fillText('▶', entry.x - 12, entry.y);
-  // Exit marker
   ctx.fillStyle = '#ff0044';
   ctx.fillText('✕', exit.x + 12, exit.y);
 
